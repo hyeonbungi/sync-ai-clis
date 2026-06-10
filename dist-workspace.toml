@@ -19,3 +19,5 @@ publish-jobs = ["homebrew", "npm"]
 install-updater = false
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
+# The archive format to use for non-windows builds (defaults .tar.xz)
+unix-archive = ".tar.gz"

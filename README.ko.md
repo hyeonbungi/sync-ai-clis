@@ -1,7 +1,9 @@
 # sync-ai-clis
 
 <p align="center">
-  <img alt="상태: v0.1.0" src="https://img.shields.io/badge/status-v0.1.0-2f80ed?style=flat-square">
+  <a href="https://crates.io/crates/sync-ai-clis">
+    <img alt="crates.io" src="https://img.shields.io/crates/v/sync-ai-clis?style=flat-square&color=2f80ed">
+  </a>
   <img alt="스택: Rust" src="https://img.shields.io/badge/stack-Rust-dea584?style=flat-square">
   <img alt="플랫폼: macOS, Windows, Linux" src="https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-44cc11?style=flat-square">
   <a href="https://github.com/hyeonbungi/sync-ai-clis/actions/workflows/ci.yml">
@@ -20,7 +22,7 @@
 
 `sync-ai-clis`는 머신을 "알려진 AI CLI가 전부 설치되어 있고, 동작하고, 최신인 상태"로 맞추는(reconcile) 크로스플랫폼(macOS · Windows · Linux) Rust CLI입니다. 설치된 도구는 업데이트하고, 미설치 도구는 동의 후 설치하며, 작업 후에는 각 도구를 재검증합니다(`command -v`가 아니라 `--version`이 실제로 도는지 확인해 깨진 설치를 잡아냅니다).
 
-**현재 상태: 코어 완성, 첫 릴리스 진행 중.** `list`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 테스트 84개와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
+**현재 상태: 릴리스됨.** `list`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 테스트 84개와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
 
 ## At A Glance
 
@@ -30,7 +32,7 @@
 | 관리 도구 (v1) | `claude`, `codex`, `gemini`, `kiro-cli`, `agy` |
 | 플랫폼 | macOS · Windows · Linux |
 | 스택 | Rust (단일 바이너리) |
-| 상태 | v0.1.0 — 3 OS 전부에서 엔진 검증 (테스트 84개 + 실채널 CI) |
+| 상태 | 릴리스됨 — 3 OS 전부에서 엔진 검증 (오프라인 테스트 84개 + 실채널 CI) |
 | 배포 | GitHub Releases · Homebrew tap · npm · crates.io · winget · Scoop |
 | 테스트 | 오프라인 84개 + Docker 배포판 매트릭스 + 3 OS 실채널 CI |
 | 라이선스 | [MIT](./LICENSE) |

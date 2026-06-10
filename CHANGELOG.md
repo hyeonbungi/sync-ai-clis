@@ -2,6 +2,12 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.1.1 - 2026-06-11
+
+### Fixed
+
+- Linux and macOS release archives are now `.tar.gz` instead of `.tar.xz`, so the npm wrapper and the shell installer work on minimal environments without `xz` installed (e.g. slim container images, bare CI runners).
+
 ## 0.1.0 - 2026-06-11
 
 First release: one command to detect, install (with consent), update, and re-verify Claude Code, Codex, Gemini, Kiro, and Antigravity across macOS, Windows, and Linux.
