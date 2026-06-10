@@ -1,0 +1,64 @@
+# Updates the Scoop manifest in hyeonbungi/scoop-bucket per release
+# (backlog #9 — was a manual step). Chains on Release completing, dispatch
+# as fallback. Cross-repo write needs SCOOP_BUCKET_TOKEN: a fine-grained
+# PAT scoped to hyeonbungi/scoop-bucket with Contents read/write.
+name: Update Scoop manifest
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (tag without the v prefix)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        id: ver
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [ -n "$DISPATCH_VERSION" ]; then
+            version="$DISPATCH_VERSION"
+          else
+            version="${RUN_BRANCH#v}"
+          fi
+          case "$version" in
+            *[!0-9.]*|"") echo "unexpected version: $version" >&2; exit 2 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Update bucket manifest (skip when already current)
+        env:
+          GH_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          url="https://github.com/hyeonbungi/sync-ai-clis/releases/download/v${VERSION}/sync-ai-clis-x86_64-pc-windows-msvc.zip"
+          hash=$(curl -sSfL "${url}.sha256" | awk '{print $1}')
+          [ -n "$hash" ] || { echo "missing sha256 for v$VERSION" >&2; exit 1; }
+
+          current=$(gh api repos/hyeonbungi/scoop-bucket/contents/bucket/sync-ai-clis.json -q .content | base64 -d)
+          if [ "$(echo "$current" | jq -r .version)" = "$VERSION" ]; then
+            echo "scoop bucket already at $VERSION — skipping"
+            exit 0
+          fi
+          sha=$(gh api repos/hyeonbungi/scoop-bucket/contents/bucket/sync-ai-clis.json -q .sha)
+          echo "$current" | jq \
+            --arg v "$VERSION" --arg u "$url" --arg h "$hash" \
+            '.version = $v | .architecture."64bit".url = $u | .architecture."64bit".hash = $h' \
+            > manifest.json
+          gh api -X PUT repos/hyeonbungi/scoop-bucket/contents/bucket/sync-ai-clis.json \
+            -f message="sync-ai-clis: update to $VERSION" \
+            -f content="$(base64 -w0 manifest.json 2>/dev/null || base64 -i manifest.json)" \
+            -f sha="$sha" -q .commit.sha
+          echo "scoop bucket updated to $VERSION"

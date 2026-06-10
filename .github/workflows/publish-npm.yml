@@ -1,0 +1,77 @@
+# Publishes the dist-built npm package via OIDC trusted publishing (TD-005)
+# — replaces the NPM_TOKEN flow (granular write tokens cap at 90 days and
+# enforce 2FA). Requires npm CLI >= 11.5.1; provenance attaches
+# automatically. Chains on Release completing, dispatch as fallback;
+# dispatch's dry-run validates auth/config without publishing.
+#
+# npmjs side: package sync-ai-clis → Settings → Trusted publisher → GitHub
+# Actions, repo hyeonbungi/sync-ai-clis, workflow file `publish-npm.yml`
+# (exact filename match, case-sensitive).
+name: Publish to npm
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to publish (tag without the v prefix)"
+        required: true
+        type: string
+      dry-run:
+        description: "Authenticate and pack, but do not publish"
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write # OIDC exchange with npm
+  contents: read
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        id: ver
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [ -n "$DISPATCH_VERSION" ]; then
+            version="$DISPATCH_VERSION"
+          else
+            version="${RUN_BRANCH#v}"
+          fi
+          case "$version" in
+            *[!0-9.]*|"") echo "unexpected version: $version" >&2; exit 2 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Ensure npm with trusted-publishing support (>= 11.5.1)
+        run: |
+          npm install -g npm@latest
+          npm --version
+      - name: Download the release npm package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --pattern '*-npm-package.tar.gz'
+      - name: Publish (skip when the version is already on npm)
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            npm publish ./sync-ai-clis-npm-package.tar.gz --access public --dry-run
+            echo "dry-run OK (authenticated via OIDC, nothing published)"
+            exit 0
+          fi
+          if [ "$(npm view "sync-ai-clis@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
+            echo "npm already at $VERSION — skipping"
+            exit 0
+          fi
+          npm publish ./sync-ai-clis-npm-package.tar.gz --access public

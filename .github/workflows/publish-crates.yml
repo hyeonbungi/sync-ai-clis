@@ -1,0 +1,71 @@
+# Publishes to crates.io via OIDC trusted publishing (TD-005) — no stored
+# token, no manual step (which got missed at v0.1.1 and left crates.io a
+# version behind). Chains on Release completing (dist releases suppress
+# release: events), dispatch as fallback; dispatch's dry-run mode validates
+# the trusted-publisher config (token mint) without publishing.
+#
+# crates.io side: crate Settings → Trusted Publishing → GitHub, repo
+# hyeonbungi/sync-ai-clis, workflow file `publish-crates.yml`.
+name: Publish to crates.io
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Mint the OIDC token and package, but do not publish"
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write # OIDC exchange with crates.io
+  contents: read
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve ref
+        id: ref
+        env:
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            ref="main" # dry-run/backfill builds main
+          else
+            ref="$RUN_BRANCH" # Release runs on tag vX.Y.Z
+            case "$ref" in
+              v*[!0-9.]*|v|"") echo "unexpected tag: $ref" >&2; exit 2 ;;
+              v*) ;;
+              *) echo "unexpected tag: $ref" >&2; exit 2 ;;
+            esac
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+      # SHA-pinned (= v1.0.4): exchanges the workflow OIDC token for a
+      # short-lived crates.io publish token.
+      - uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe
+        id: auth
+      - name: Publish (skip when the version is already on crates.io)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          if [ "$DRY_RUN" = "true" ]; then
+            cargo publish --dry-run
+            echo "dry-run OK (token minted, package verified, nothing published)"
+            exit 0
+          fi
+          published=$(curl -s -A sync-ai-clis-release https://crates.io/api/v1/crates/sync-ai-clis | jq -r .crate.max_version)
+          if [ "$published" = "$version" ]; then
+            echo "crates.io already at $version — skipping"
+            exit 0
+          fi
+          cargo publish
