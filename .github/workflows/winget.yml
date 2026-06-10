@@ -1,0 +1,30 @@
+# Publishes each release to the Windows Package Manager (SPEC §9.1 D8):
+# winget install hyeonbungi.sync-ai-clis. Standalone on purpose — dist
+# regenerates release.yml, and this workflow must survive that.
+#
+# Requirements (SPEC §11):
+# - WINGET_TOKEN repo secret: a CLASSIC PAT with the public_repo scope.
+#   Fine-grained PATs are NOT supported by WinGet Releaser/Komac.
+# - The repository (and its release assets) must be public — this fires
+#   for real starting with the public v0.1.0 release (P2-005).
+# - One-time bootstrap: microsoft/winget-pkgs requires the very first
+#   version of a new package to be submitted as a new-package PR (komac
+#   new / wingetcreate); the action then automates every later version.
+#   Tracked in the Phase 2 plan for P2-005.
+name: Publish to WinGet
+
+on:
+  release:
+    types: [released] # full releases only, not prereleases
+
+jobs:
+  winget:
+    runs-on: ubuntu-latest
+    steps:
+      # SHA-pinned (= v2): this third-party action receives a PAT that can
+      # write to all public repos, so a mutable tag is not acceptable.
+      - uses: vedantmgoyal9/winget-releaser@4ffc7888bffd451b357355dc214d43bb9f23917e
+        with:
+          identifier: hyeonbungi.sync-ai-clis
+          installers-regex: '\.msi$' # winget consumes the dist-built MSI
+          token: ${{ secrets.WINGET_TOKEN }}

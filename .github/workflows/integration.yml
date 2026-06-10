@@ -1,0 +1,115 @@
+# Layers 2–3 (SPEC §8.2/§8.3): REAL installs and updates, only on disposable
+# infrastructure — Docker containers and GitHub-hosted runners (never the dev
+# machine, SPEC §8.5). Network-dependent and slower, so it runs on manual
+# dispatch and a weekly schedule instead of every push (macOS minutes bill
+# 10x on private repos).
+#
+# Known limitation: GitHub Windows runners are Windows Server, not Windows 11,
+# so Kiro's positive install path cannot run here — this workflow pins that
+# kiro is a clear SKIP either way (Server 2022 fails the build>=22000 gate;
+# Server 2025 passes it but hits the unconfirmed-command skip, SPEC §11
+# backlog #2 tracks real-Win11 verification).
+name: Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      matrix:
+        description: "Linux docker matrix size (smoke | full)"
+        default: smoke
+        type: choice
+        options: [smoke, full]
+      tools:
+        description: "Tools for the Linux docker legs"
+        default: claude,antigravity
+        type: string
+  schedule:
+    - cron: "37 18 * * 5" # weekly, Friday 18:37 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  linux-docker:
+    name: linux docker (${{ inputs.matrix || 'full' }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run real install/update matrix in containers
+        # Workflow inputs flow through env (never interpolated into the
+        # shell) — the script and the CLI both validate their values.
+        env:
+          MATRIX: ${{ inputs.matrix || 'full' }}
+          TOOLS: ${{ inputs.tools || 'claude,antigravity' }}
+        run: docker/run-matrix.sh
+
+  linux-musl:
+    name: linux musl (experimental)
+    runs-on: ubuntu-latest
+    continue-on-error: true # upstream installers may not ship musl builds
+    steps:
+      - uses: actions/checkout@v5
+      - run: RUN_MUSL=1 MATRIX=smoke docker/run-matrix.sh
+
+  macos-real:
+    name: macos real channels (5 tools)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: cargo build --release
+      - name: Pre-seed brew cask and npm channels
+        run: |
+          brew install --cask codex
+          npm install -g @google/gemini-cli
+      - name: Real sync — natives install, brew/npm channels update
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          ./target/release/sync-ai-clis --yes --only claude,codex,gemini,kiro,antigravity --json > result.json
+          cat result.json
+          jq -e 'length == 5 and all(.[]; .result == "ok")' result.json
+      - name: Re-verify every tool runs
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          claude --version
+          codex --version
+          gemini --version
+          kiro-cli --version
+          agy --version
+          ./target/release/sync-ai-clis list
+
+  windows-real:
+    name: windows real channels (+ kiro skip pin)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release
+      - name: Real sync — native PowerShell installers, kiro must skip
+        shell: bash
+        run: |
+          ./target/release/sync-ai-clis.exe --yes --only claude,antigravity,kiro --json > result.json
+          cat result.json
+          jq -e '(map(select(.id == "claude" or .id == "antigravity")) | length == 2 and all(.result == "ok")) and (map(select(.id == "kiro")) | all(.result == "skip" and .reason != null))' result.json
+      - name: Verify antigravity at its known install dir
+        shell: pwsh
+        run: |
+          & "$env:LOCALAPPDATA\agy\bin\agy.exe" --version
+      - name: Locate claude install dir (informative — backlog #3)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $candidate = "$env:USERPROFILE\.local\bin\claude.exe"
+          if (Test-Path $candidate) {
+            Write-Host "claude found at $candidate"
+            & $candidate --version
+          } else {
+            Write-Host "claude not at $candidate — listing candidates for backlog #3"
+            Get-ChildItem -Path "$env:USERPROFILE\.local" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 20
+            Get-ChildItem -Path "$env:LOCALAPPDATA" -Directory -ErrorAction SilentlyContinue | Select-Object Name -First 30
+          }
