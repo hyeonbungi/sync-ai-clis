@@ -66,9 +66,19 @@ jobs:
           DRY_RUN: ${{ inputs.dry-run }}
         run: |
           if [ "$DRY_RUN" = "true" ]; then
-            npm publish ./sync-ai-clis-npm-package.tar.gz --access public --dry-run
-            echo "dry-run OK (authenticated via OIDC, nothing published)"
-            exit 0
+            # npm --dry-run still authenticates and validates against the
+            # registry; "cannot publish over" on an already-released version
+            # therefore PROVES the OIDC trusted-publisher config works.
+            set +e
+            out=$(npm publish ./sync-ai-clis-npm-package.tar.gz --access public --dry-run 2>&1)
+            code=$?
+            set -e
+            echo "$out"
+            if [ "$code" -eq 0 ] || echo "$out" | grep -q "cannot publish over"; then
+              echo "dry-run OK (authenticated via OIDC, nothing published)"
+              exit 0
+            fi
+            exit "$code"
           fi
           if [ "$(npm view "sync-ai-clis@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
             echo "npm already at $VERSION — skipping"
