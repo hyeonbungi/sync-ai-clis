@@ -1,0 +1,40 @@
+# One-time bootstrap: microsoft/winget-pkgs requires a brand-new package's
+# first version to be submitted as a new-package PR. Komac does this
+# non-interactively in CI; afterwards winget.yml automates every version.
+# Manual dispatch only — run once per new package identifier.
+name: WinGet Bootstrap (first version)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version (release tag without the v prefix)"
+        default: "0.1.0"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install komac
+        run: cargo install komac --locked
+      - name: Submit new-package PR to winget-pkgs
+        env:
+          GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          komac new hyeonbungi.sync-ai-clis \
+            --version "$VERSION" \
+            --urls "https://github.com/hyeonbungi/sync-ai-clis/releases/download/v${VERSION}/sync-ai-clis-x86_64-pc-windows-msvc.msi" \
+            --package-name "sync-ai-clis" \
+            --publisher "hyeonbungi" \
+            --license "MIT" \
+            --license-url "https://github.com/hyeonbungi/sync-ai-clis/blob/main/LICENSE" \
+            --package-url "https://github.com/hyeonbungi/sync-ai-clis" \
+            --publisher-url "https://github.com/hyeonbungi" \
+            --short-description "Detect, install, and keep AI coding CLIs up to date with one command" \
+            --submit

@@ -2,23 +2,32 @@
 # winget install hyeonbungi.sync-ai-clis. Standalone on purpose — dist
 # regenerates release.yml, and this workflow must survive that.
 #
+# Triggers: releases created by dist's pipeline use GITHUB_TOKEN, and
+# GitHub suppresses `release:` events from GITHUB_TOKEN-created resources
+# (recursion guard) — so we chain on the Release workflow completing
+# (workflow_run fires regardless of token) and keep a manual dispatch as
+# fallback. The action picks up the latest release.
+#
 # Requirements (SPEC §11):
 # - WINGET_TOKEN repo secret: a CLASSIC PAT with the public_repo scope.
 #   Fine-grained PATs are NOT supported by WinGet Releaser/Komac.
-# - The repository (and its release assets) must be public — this fires
-#   for real starting with the public v0.1.0 release (P2-005).
-# - One-time bootstrap: microsoft/winget-pkgs requires the very first
-#   version of a new package to be submitted as a new-package PR (komac
-#   new / wingetcreate); the action then automates every later version.
-#   Tracked in the Phase 2 plan for P2-005.
+# - The package must already exist in microsoft/winget-pkgs — the very
+#   first version is submitted once via winget-bootstrap.yml (komac new).
 name: Publish to WinGet
 
 on:
-  release:
-    types: [released] # full releases only, not prereleases
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   winget:
+    # For workflow_run, only proceed when Release succeeded; dispatch always runs.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       # SHA-pinned (= v2): this third-party action receives a PAT that can
