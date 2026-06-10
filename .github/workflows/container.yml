@@ -44,9 +44,12 @@ jobs:
             *[!0-9.]*|"") echo "unexpected version: $version" >&2; exit 2 ;;
           esac
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      # workflow_run (future releases): build exactly the released tag.
+      # workflow_dispatch (manual/backfill): build main — older tags may
+      # predate the Dockerfile; the version input only stamps tags/labels.
       - uses: actions/checkout@v5
         with:
-          ref: v${{ steps.ver.outputs.version }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || format('v{0}', steps.ver.outputs.version) }}
       # SHA-pinned (= v3): installs QEMU binfmt so buildx can build arm64.
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
       - name: Build and push (amd64 + arm64)
