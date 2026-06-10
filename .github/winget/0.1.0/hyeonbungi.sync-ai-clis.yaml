@@ -1,0 +1,6 @@
+# Created for the one-time winget-pkgs new-package submission (v0.1.0).
+PackageIdentifier: hyeonbungi.sync-ai-clis
+PackageVersion: 0.1.0
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0
