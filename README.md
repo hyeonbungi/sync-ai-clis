@@ -66,6 +66,12 @@ scoop install sync-ai-clis
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/hyeonbungi/sync-ai-clis/releases/latest/download/sync-ai-clis-installer.ps1 | iex"
 ```
 
+```dockerfile
+# Docker / devcontainers — bake AI CLIs into your image (static musl binary, amd64+arm64)
+COPY --from=ghcr.io/hyeonbungi/sync-ai-clis:latest /sync-ai-clis /usr/local/bin/sync-ai-clis
+RUN sync-ai-clis --yes --only claude,gemini
+```
+
 ## Usage
 
 The contract from [SPEC.md](./SPEC.md) §6, fully implemented:

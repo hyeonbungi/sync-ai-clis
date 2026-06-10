@@ -307,6 +307,7 @@ codex  = "npm"
 - **crates.io**: `cargo install sync-ai-clis` (Rust라 거의 공짜 보너스)
 - **winget** (Windows 공식, 기본 탑재): `winget install hyeonbungi.sync-ai-clis`. dist가 만든 MSI/EXE 기반, **WinGet Releaser** GitHub Action(내부적으로 Komac)으로 릴리스 시 winget-pkgs에 자동 제출 (classic PAT `public_repo` 필요)
 - **Scoop** (Windows 개발자용, 버킷=탭): 개인 버킷 `hyeonbungi/scoop-bucket`. 매니페스트 `checkver`/`autoupdate`로 GitHub Releases 자동 추적. `scoop bucket add hyeonbungi https://github.com/hyeonbungi/scoop-bucket; scoop install sync-ai-clis`
+- **ghcr.io 컨테이너 이미지** (2026-06-11 추가): `ghcr.io/hyeonbungi/sync-ai-clis` — scratch 위 정적 musl 바이너리(amd64+arm64). devcontainer/CI 이미지에 `COPY --from`으로 베이킹하는 프로비저닝 용도(런타임 아님 — scratch엔 셸/CA 없음). 릴리스마다 GITHUB_TOKEN만으로 자동 발행
 
 ### 9.2 권장: `dist` (구 cargo-dist)
 GitHub Releases + Homebrew tap formula + npm wrapper + shell/PowerShell 설치기 + **MSI**를 **한 번에 생성·유지**해 준다. 단 **Scoop·winget 매니페스트는 dist가 자동 생성하지 않는다**(Scoop은 cargo-dist 이슈 #521로 미지원). 따라서:

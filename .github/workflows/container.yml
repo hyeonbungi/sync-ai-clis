@@ -1,0 +1,64 @@
+# Publishes ghcr.io/hyeonbungi/sync-ai-clis per release: a multi-arch
+# (amd64+arm64) static musl binary on scratch, meant as a COPY --from source
+# for devcontainer/CI provisioning (see Dockerfile header).
+#
+# Chains on the Release workflow completing (dist creates releases with
+# GITHUB_TOKEN, whose release: events are suppressed), with a manual
+# dispatch fallback. Pushes with GITHUB_TOKEN only — no external secrets.
+# Third-party surface is one SHA-pinned action (QEMU binfmt for arm64);
+# everything else is the docker CLI.
+name: Container Image
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to build (tag without the v prefix)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        id: ver
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [ -n "$DISPATCH_VERSION" ]; then
+            version="$DISPATCH_VERSION"
+          else
+            version="${RUN_BRANCH#v}" # Release runs on tag vX.Y.Z
+          fi
+          case "$version" in
+            *[!0-9.]*|"") echo "unexpected version: $version" >&2; exit 2 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v5
+        with:
+          ref: v${{ steps.ver.outputs.version }}
+      # SHA-pinned (= v3): installs QEMU binfmt so buildx can build arm64.
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
+      - name: Build and push (amd64 + arm64)
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker buildx create --use
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg VERSION="$VERSION" \
+            -t "ghcr.io/hyeonbungi/sync-ai-clis:$VERSION" \
+            -t "ghcr.io/hyeonbungi/sync-ai-clis:latest" \
+            --push .

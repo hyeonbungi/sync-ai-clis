@@ -66,6 +66,12 @@ scoop install sync-ai-clis
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/hyeonbungi/sync-ai-clis/releases/latest/download/sync-ai-clis-installer.ps1 | iex"
 ```
 
+```dockerfile
+# Docker / devcontainer — 이미지에 AI CLI 베이킹 (정적 musl 바이너리, amd64+arm64)
+COPY --from=ghcr.io/hyeonbungi/sync-ai-clis:latest /sync-ai-clis /usr/local/bin/sync-ai-clis
+RUN sync-ai-clis --yes --only claude,gemini
+```
+
 ## 사용법
 
 [SPEC.md](./SPEC.md) §6에서 확정한 계약 그대로 구현되어 있습니다:
