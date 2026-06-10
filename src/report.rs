@@ -23,27 +23,28 @@ pub fn outcome_label(outcome: Outcome, color: bool) -> String {
     }
 }
 
-/// One result line for a tool: `display  before -> after  LABEL (reason)`.
-pub fn tool_line(report: &ToolReport, color: bool) -> String {
+/// One result line for a tool: `display  before -> after  LABEL (note)`.
+/// Under `dry_run` a pending after-version renders as `(dry-run)` (TD-006).
+pub fn tool_line(report: &ToolReport, color: bool, dry_run: bool) -> String {
     let mut line = format!(
         "{}  {} -> {}  {}",
         report.display,
         version_or_none(&report.before),
-        version_or_none(&report.after),
+        after_text(report, dry_run),
         outcome_label(report.outcome, color)
     );
-    if let Some(reason) = &report.reason {
-        line.push_str(&format!(" ({reason})"));
+    if let Some(note) = note_text(report) {
+        line.push_str(&format!(" ({note})"));
     }
     line
 }
 
 /// Final aligned summary table (original-script style), one row per tool.
-pub fn summary_table(reports: &[ToolReport], color: bool) -> String {
+pub fn summary_table(reports: &[ToolReport], color: bool, dry_run: bool) -> String {
     let width = |f: &dyn Fn(&ToolReport) -> usize| reports.iter().map(f).max().unwrap_or(0);
     let display_width = width(&|r| r.display.len());
     let before_width = width(&|r| version_or_none(&r.before).len());
-    let after_width = width(&|r| version_or_none(&r.after).len());
+    let after_width = width(&|r| after_text(r, dry_run).len());
 
     reports
         .iter()
@@ -52,11 +53,11 @@ pub fn summary_table(reports: &[ToolReport], color: bool) -> String {
                 "  {:<display_width$}  {:<before_width$} -> {:<after_width$}  {}",
                 r.display,
                 version_or_none(&r.before),
-                version_or_none(&r.after),
+                after_text(r, dry_run),
                 outcome_label(r.outcome, color)
             );
-            if let Some(reason) = &r.reason {
-                row.push_str(&format!("  {reason}"));
+            if let Some(note) = note_text(r) {
+                row.push_str(&format!("  {note}"));
             }
             row
         })
@@ -89,6 +90,28 @@ fn version_or_none(version: &Option<String>) -> &str {
         .as_deref()
         .filter(|v| !v.is_empty())
         .unwrap_or("(none)")
+}
+
+/// After-slot text: in dry-run nothing executed, so a missing after-version
+/// means "pending", not "gone" — JSON keeps the raw null (SPEC §6.3).
+fn after_text(report: &ToolReport, dry_run: bool) -> &str {
+    if dry_run && report.after.is_none() {
+        return "(dry-run)";
+    }
+    version_or_none(&report.after)
+}
+
+/// Trailing note: the engine's reason wins; otherwise an idempotent update
+/// (same version before and after) is flagged as already current (SPEC §11).
+fn note_text(report: &ToolReport) -> Option<&str> {
+    if let Some(reason) = &report.reason {
+        return Some(reason);
+    }
+    let unchanged = report.action == ActionKind::Update
+        && report.outcome == Outcome::Ok
+        && report.before.is_some()
+        && report.before == report.after;
+    unchanged.then_some("already current")
 }
 
 fn action_str(action: ActionKind) -> &'static str {
@@ -149,12 +172,12 @@ mod tests {
 
     #[test]
     fn tool_line_shows_versions_outcome_and_reason() {
-        let line = tool_line(&ok_report(), false);
+        let line = tool_line(&ok_report(), false, false);
         assert!(line.contains("Claude Code"), "line: {line}");
         assert!(line.contains("1.0.0 -> 1.1.0"), "line: {line}");
         assert!(line.contains("OK"), "line: {line}");
 
-        let skip = tool_line(&skip_report(), false);
+        let skip = tool_line(&skip_report(), false, false);
         assert!(skip.contains("(none)"), "missing versions render: {skip}");
         assert!(skip.contains("SKIP"), "line: {skip}");
         assert!(skip.contains("Windows 11"), "reason shown: {skip}");
@@ -162,7 +185,7 @@ mod tests {
 
     #[test]
     fn summary_table_has_one_aligned_row_per_tool() {
-        let table = summary_table(&[ok_report(), skip_report()], false);
+        let table = summary_table(&[ok_report(), skip_report()], false, false);
         let rows: Vec<&str> = table.lines().collect();
         assert_eq!(rows.len(), 2, "table: {table}");
         assert!(rows[0].contains("Claude Code") && rows[0].contains("OK"));
@@ -192,5 +215,58 @@ mod tests {
         assert_eq!(rows[1]["action"], "install");
         assert_eq!(rows[1]["result"], "skip");
         assert!(rows[1]["reason"].as_str().unwrap().contains("Windows 11"));
+    }
+}
+
+#[cfg(test)]
+mod rendering_polish_tests {
+    use super::*;
+    use crate::engine::{ActionKind, Outcome, ToolReport};
+
+    fn report(before: Option<&str>, after: Option<&str>) -> ToolReport {
+        ToolReport {
+            id: "claude".into(),
+            display: "Claude Code".into(),
+            installed: true,
+            before: before.map(String::from),
+            after: after.map(String::from),
+            action: ActionKind::Update,
+            outcome: Outcome::Ok,
+            reason: None,
+            commands: vec!["claude update".into()],
+        }
+    }
+
+    #[test]
+    fn dry_run_renders_pending_result_not_none() {
+        // TD-006 (first real-user feedback): "2.1.170 -> (none) OK" reads
+        // like the version vanishes. Under dry-run the result is pending.
+        let line = tool_line(&report(Some("2.1.170"), None), false, true);
+        assert!(line.contains("2.1.170 -> (dry-run)"), "line: {line}");
+        assert!(!line.contains("(none)"), "line: {line}");
+
+        let table = summary_table(&[report(Some("2.1.170"), None)], false, true);
+        assert!(table.contains("(dry-run)"), "table: {table}");
+    }
+
+    #[test]
+    fn missing_versions_still_render_none_outside_dry_run() {
+        let line = tool_line(&report(None, None), false, false);
+        assert!(line.contains("(none) -> (none)"), "line: {line}");
+    }
+
+    #[test]
+    fn unchanged_update_is_marked_already_current() {
+        // SPEC §11 open question: idempotent updates should say so.
+        let line = tool_line(&report(Some("2.1.170"), Some("2.1.170")), false, false);
+        assert!(line.contains("already current"), "line: {line}");
+
+        // A real upgrade must NOT carry the marker.
+        let upgraded = tool_line(&report(Some("2.1.170"), Some("2.2.0")), false, false);
+        assert!(!upgraded.contains("already current"), "line: {upgraded}");
+
+        // The summary table marks it the same way.
+        let table = summary_table(&[report(Some("2.1.170"), Some("2.1.170"))], false, false);
+        assert!(table.contains("already current"), "table: {table}");
     }
 }

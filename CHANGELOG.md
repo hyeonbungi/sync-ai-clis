@@ -2,6 +2,14 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.1.2 - 2026-06-11
+
+### Changed
+
+- `--dry-run` now renders the pending result version as `(dry-run)` instead of `(none)` — nothing was executed, so the version is pending, not gone (first real-user feedback).
+- Updates that end on the same version are now marked `already current`, making idempotent update runs explicit.
+- `--json` output is unchanged: it keeps raw values (`after` stays `null` under `--dry-run`).
+
 ## 0.1.1 - 2026-06-11
 
 ### Fixed

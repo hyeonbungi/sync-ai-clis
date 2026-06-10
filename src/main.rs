@@ -81,7 +81,7 @@ fn run() -> i32 {
         }
         let report = engine.sync_tool(tool);
         if !quiet {
-            anstream::println!("   {}", report::tool_line(&report, true));
+            anstream::println!("   {}", report::tool_line(&report, true, cli.dry_run));
             if cli.dry_run {
                 for command in &report.commands {
                     anstream::println!("   would run: {command}");
@@ -95,7 +95,7 @@ fn run() -> i32 {
         println!("{}", report::json_summary(&reports));
     } else {
         anstream::println!("\n==> Summary");
-        anstream::println!("{}", report::summary_table(&reports, true));
+        anstream::println!("{}", report::summary_table(&reports, true, cli.dry_run));
     }
     if engine::all_ok(&reports) { 0 } else { 1 }
 }
