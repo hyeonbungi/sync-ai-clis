@@ -1,0 +1,50 @@
+name: New AI CLI request
+description: Propose a new tool for the registry — the answers below map 1:1 onto a ToolSpec entry
+labels: [new-tool]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tool support is one declarative module (see CONTRIBUTING.md "Adding A New AI CLI") —
+        PRs are very welcome. If you'd rather just request it, fill this in as far as you can.
+  - type: input
+    id: name
+    attributes:
+      label: Tool name and binary
+      placeholder: "Example CLI — binary: example-cli"
+    validations:
+      required: true
+  - type: input
+    id: version-cmd
+    attributes:
+      label: Version command
+      placeholder: example-cli --version
+    validations:
+      required: true
+  - type: textarea
+    id: install
+    attributes:
+      label: Official install method per OS
+      description: Official HTTPS URLs only (docs page + installer URL). This project never ships guessed or third-party install sources — unverified channels become explicit SKIPs.
+      placeholder: |
+        macOS/Linux: curl -fsSL https://example.com/install.sh | sh  (docs: https://…)
+        Windows: irm https://example.com/install.ps1 | iex
+    validations:
+      required: true
+  - type: input
+    id: self-update
+    attributes:
+      label: Self-update command (if any)
+      placeholder: example-cli update
+  - type: textarea
+    id: managers
+    attributes:
+      label: Package manager availability
+      placeholder: "brew: example-cli / npm: @example/cli / winget: Example.Cli / scoop: —"
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Checklist
+      options:
+        - label: The install URLs above are the official ones from the tool's own documentation
+          required: true

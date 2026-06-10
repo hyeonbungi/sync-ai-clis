@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest an improvement to sync-ai-clis itself
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Quick scope check (SPEC.md §3 non-goals): sync-ai-clis only installs, updates, and
+        verifies AI CLIs. Running/orchestrating the tools, account/quota management, GUI/TUI,
+        telemetry, and background daemons are out of scope for v1.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What would the command/flag/output look like?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered

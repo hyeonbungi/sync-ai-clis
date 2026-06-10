@@ -41,6 +41,10 @@ git diff --check
 
 Real installs/updates must never run on your development machine — exercise them through `docker/run-matrix.sh` (disposable containers) or CI.
 
+## Versioning
+
+SemVer, currently in the 0.x phase (SPEC.md §9.5): **patch** releases fix bugs or packaging without changing user-visible behavior; **minor** releases add or change behavior (0.x allows breaking changes in minors, per Cargo's caret semantics). `1.0.0` will declare the CLI contract stable — flags, exit codes, the `--json` schema, and the config format. Version numbers are never reused: a bad release is fixed by shipping the next number. Every release pairs a `Cargo.toml` bump with a `## X.Y.Z - date` section in `CHANGELOG.md`, which becomes the release notes.
+
 ## Pull Request Expectations
 
 - Keep each PR focused on one main change.

@@ -1,0 +1,73 @@
+name: Bug report
+description: Something didn't work — wrong command chosen, install/update failed, broken output
+labels: [bug]
+body:
+  - type: dropdown
+    id: channel
+    attributes:
+      label: How did you install sync-ai-clis?
+      options:
+        - Homebrew tap
+        - Shell installer
+        - npm
+        - cargo install
+        - winget
+        - Scoop
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: sync-ai-clis --version
+      placeholder: sync-ai-clis 0.1.1
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows
+        - Linux (glibc)
+        - Linux (musl / Alpine)
+    validations:
+      required: true
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which managed tool is affected?
+      options:
+        - Claude Code
+        - Codex CLI
+        - Gemini CLI
+        - Kiro CLI
+        - Antigravity CLI
+        - sync-ai-clis itself
+        - Multiple / not tool-specific
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: Include how the affected tool was originally installed (brew / npm / native installer / winget / scoop) if you know.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Paste the output of `sync-ai-clis --dry-run` (shows the commands it would pick) and/or the failing run. `--json` output is also great. Remove anything private.
+      render: shell
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues for this problem
+          required: true
+        - label: The pasted output contains no tokens or private data
+          required: true
