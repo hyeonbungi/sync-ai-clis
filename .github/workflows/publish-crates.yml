@@ -1,17 +1,19 @@
 # Publishes to crates.io via OIDC trusted publishing (TD-005) — no stored
 # token, no manual step (which got missed at v0.1.1 and left crates.io a
-# version behind). Chains on Release completing (dist releases suppress
-# release: events), dispatch as fallback; dispatch's dry-run mode validates
-# the trusted-publisher config (token mint) without publishing.
+# version behind). Triggered directly by the release tag: crates.io rejects
+# the workflow_run trigger for trusted publishing ("security concerns",
+# discovered live at v0.1.2), and cargo publish only needs the source tree,
+# not the Release artifacts. Dispatch is the fallback/backfill path; its
+# dry-run mode validates the trusted-publisher config (token mint) without
+# publishing.
 #
 # crates.io side: crate Settings → Trusted Publishing → GitHub, repo
 # hyeonbungi/sync-ai-clis, workflow file `publish-crates.yml`.
 name: Publish to crates.io
 
 on:
-  workflow_run:
-    workflows: [Release]
-    types: [completed]
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       dry-run:
@@ -25,28 +27,10 @@ permissions:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve ref
-        id: ref
-        env:
-          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            ref="main" # dry-run/backfill builds main
-          else
-            ref="$RUN_BRANCH" # Release runs on tag vX.Y.Z
-            case "$ref" in
-              v*[!0-9.]*|v|"") echo "unexpected tag: $ref" >&2; exit 2 ;;
-              v*) ;;
-              *) echo "unexpected tag: $ref" >&2; exit 2 ;;
-            esac
-          fi
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      # push(tag) checks out the tag itself; dispatch checks out main.
       - uses: actions/checkout@v5
-        with:
-          ref: ${{ steps.ref.outputs.ref }}
       - uses: dtolnay/rust-toolchain@stable
       # SHA-pinned (= v1.0.4): exchanges the workflow OIDC token for a
       # short-lived crates.io publish token.
