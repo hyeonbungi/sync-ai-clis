@@ -2,6 +2,8 @@
 
 Thank you for considering a contribution to `sync-ai-clis`.
 
+Participation in this project is governed by the [Code of Conduct](./CODE_OF_CONDUCT.md).
+
 This project detects, installs, and updates multiple AI coding CLIs across macOS, Windows, and Linux. The design — decisions, architecture, and the per-tool command matrix — lives in [SPEC.md](./SPEC.md); please skim it before proposing changes.
 
 ## Good Contributions
