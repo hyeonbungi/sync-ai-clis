@@ -394,7 +394,10 @@ mod tests {
         }
     }
 
-    /// npm-channel fixture for the owning-npm pin behavior.
+    /// npm-channel fixture for the owning-npm pin behavior. Gated like
+    /// its only consumer (the unix symlink test) so Windows clippy does
+    /// not flag it as dead code.
+    #[cfg(unix)]
     fn npm_footool() -> ToolSpec {
         ToolSpec {
             update: |_, source| match source {
