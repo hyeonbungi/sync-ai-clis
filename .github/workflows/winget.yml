@@ -6,13 +6,20 @@
 # GitHub suppresses `release:` events from GITHUB_TOKEN-created resources
 # (recursion guard) — so we chain on the Release workflow completing
 # (workflow_run fires regardless of token) and keep a manual dispatch as
-# fallback. The action picks up the latest release.
+# fallback.
+#
+# release-tag must be passed explicitly: the action's default is
+# github.ref_name, which is `main` for both workflow_run and dispatch
+# (404: releases/tags/main — bit us live at v0.1.2). workflow_run derives
+# the tag from head_branch (Release runs on the tag); dispatch takes it
+# as an input.
 #
 # Requirements (SPEC §11):
 # - WINGET_TOKEN repo secret: a CLASSIC PAT with the public_repo scope.
 #   Fine-grained PATs are NOT supported by WinGet Releaser/Komac.
 # - The package must already exist in microsoft/winget-pkgs — the very
-#   first version is submitted once via winget-bootstrap.yml (komac new).
+#   first version is submitted once via winget-bootstrap.yml. Done:
+#   hyeonbungi.sync-ai-clis 0.1.0 merged 2026-06-11 (PR #386238).
 name: Publish to WinGet
 
 on:
@@ -20,6 +27,11 @@ on:
     workflows: [Release]
     types: [completed]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v0.1.2)"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -30,10 +42,24 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve release tag
+        id: tag
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          tag="${DISPATCH_TAG:-$RUN_BRANCH}"
+          case "$tag" in
+            v*[!0-9.]*|v|"") echo "unexpected tag: $tag" >&2; exit 2 ;;
+            v*) ;;
+            *) echo "unexpected tag: $tag" >&2; exit 2 ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       # SHA-pinned (= v2): this third-party action receives a PAT that can
       # write to all public repos, so a mutable tag is not acceptable.
       - uses: vedantmgoyal9/winget-releaser@4ffc7888bffd451b357355dc214d43bb9f23917e
         with:
           identifier: hyeonbungi.sync-ai-clis
+          release-tag: ${{ steps.tag.outputs.tag }}
           installers-regex: '\.msi$' # winget consumes the dist-built MSI
           token: ${{ secrets.WINGET_TOKEN }}
