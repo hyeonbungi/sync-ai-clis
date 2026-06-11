@@ -38,9 +38,9 @@
   <img alt="sync-ai-clis --dry-run: every tool, its detected install channel, and the exact commands that would run" src="https://raw.githubusercontent.com/hyeonbungi/sync-ai-clis/main/.github/assets/terminal-demo.svg" width="600">
 </p>
 
-`sync-ai-clis` is a cross-platform (macOS · Windows · Linux) Rust CLI that reconciles your machine toward "every known AI CLI installed, working, and current": installed tools get updated, missing tools are installed after consent, and each tool is re-verified after the work (`--version` must actually run, catching broken installs — not just `command -v`).
+`sync-ai-clis` is a cross-platform (macOS · Windows · Linux) Rust CLI that reconciles your machine toward one state: every known AI CLI installed, working, and current. Installed tools get updated. Missing tools are installed after you consent. Then every tool is re-verified by actually running `--version`, which catches broken installs that `command -v` would miss.
 
-**Current status: released.** `list`, `--dry-run`, and consent-based install/update all work, verified by 87 tests plus real-channel runs on Linux containers, macOS, and Windows CI. The full design — confirmed decisions, architecture, per-tool install/update matrix, test and release strategy — lives in [SPEC.md](./SPEC.md), the single source of truth for this repository.
+**Current status: released.** `list`, `--dry-run`, and consent-based install/update all work, verified by 87 tests plus real-channel runs on Linux containers, macOS, and Windows CI. [SPEC.md](./SPEC.md) holds the full design — confirmed decisions, architecture, the per-tool install/update matrix, and the test and release strategy. It is the single source of truth for this repository.
 
 ## At A Glance
 
@@ -105,11 +105,11 @@ sync-ai-clis list            # known tools + installed/current version table (al
 sync-ai-clis --json          # machine-readable summary
 ```
 
-Exit codes: `0` all OK · `1` any failure · `2` usage error. Configuration lives in `~/.config/sync-ai-clis/config.toml` (flags win over config).
+Exit codes: `0` all OK · `1` any failure · `2` usage error. Configuration lives in `~/.config/sync-ai-clis/config.toml`, and flags win over config.
 
 ## Trust Model
 
-This tool executes remote official installers (`curl | bash`, `irm | iex`) and package-manager commands, so its security rules are explicit by design ([SPEC.md](./SPEC.md) §5.5):
+This tool runs remote official installers (`curl | bash`, `irm | iex`) and package-manager commands, so its security rules are spelled out rather than left implicit ([SPEC.md](./SPEC.md) §5.5):
 
 - Install/update URLs are **hardcoded official HTTPS constants** in the tool registry — neither config nor flags can inject arbitrary URLs.
 - Installing a missing tool requires **consent**: an interactive prompt or an explicit `--yes`.
@@ -137,13 +137,13 @@ cargo run -- --dry-run     # show exactly what a sync would run, execute nothing
 docker/run-matrix.sh       # real install/update integration (disposable containers only)
 ```
 
-Design rationale — decisions, architecture, the per-tool command matrix, and the test strategy — lives in [SPEC.md](./SPEC.md). Real installs and updates are never exercised on a development machine: that is what the Docker matrix and CI runners are for.
+For the reasoning behind it — decisions, architecture, the per-tool command matrix, and the test strategy — see [SPEC.md](./SPEC.md). Real installs and updates never run on a development machine; that is what the Docker matrix and CI runners are for.
 
 ## Known Limitations
 
-- **Kiro on Windows**: requires Windows 11, and the exact official install command is not confirmed upstream yet — sync-ai-clis reports a clear SKIP instead of guessing a URL (already-installed `kiro-cli` still self-updates fine). Tracked in [SPEC.md](./SPEC.md) §11.
-- **Alpine/musl**: the sync-ai-clis binary itself runs on musl, but most upstream installers do not ship musl builds yet.
-- **Config `[channels]` overrides** are parsed but not applied to channel selection yet.
+- **Kiro on Windows**: needs Windows 11, and upstream has not confirmed the exact official install command yet, so sync-ai-clis reports a clear SKIP rather than guess a URL. An already-installed `kiro-cli` still self-updates fine. Tracked in [SPEC.md](./SPEC.md) §11.
+- **Alpine/musl**: the sync-ai-clis binary runs on musl, but most upstream installers do not ship musl builds yet.
+- **Config `[channels]` overrides** are parsed, but channel selection does not apply them yet.
 
 ## Maintenance Signals
 
@@ -154,7 +154,7 @@ Design rationale — decisions, architecture, the per-tool command matrix, and t
 
 ## Origin
 
-This tool grows out of a personal macOS-only bash script (`update-ai-clis`) that updated and re-verified five AI CLIs. v1 generalizes it: three OSes, consent-based installation of missing tools, and public distribution channels.
+This tool grew out of a personal macOS-only bash script (`update-ai-clis`) that updated and re-verified five AI CLIs. v1 generalizes it to three OSes, with consent-based installation of missing tools and public distribution channels.
 
 ## Author
 

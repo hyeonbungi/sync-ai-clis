@@ -38,7 +38,7 @@
   <img alt="sync-ai-clis --dry-run 출력: 도구별 감지된 설치 채널과 실제 실행될 명령" src="https://raw.githubusercontent.com/hyeonbungi/sync-ai-clis/main/.github/assets/terminal-demo.svg" width="600">
 </p>
 
-`sync-ai-clis`는 머신을 "알려진 AI CLI가 전부 설치되어 있고, 동작하고, 최신인 상태"로 맞추는(reconcile) 크로스플랫폼(macOS · Windows · Linux) Rust CLI입니다. 설치된 도구는 업데이트하고, 미설치 도구는 동의 후 설치하며, 작업 후에는 각 도구를 재검증합니다(`command -v`가 아니라 `--version`이 실제로 도는지 확인해 깨진 설치를 잡아냅니다).
+`sync-ai-clis`는 머신을 "알려진 AI CLI가 전부 설치되어 있고, 동작하고, 최신인 상태"로 맞추는(reconcile) 크로스플랫폼(macOS · Windows · Linux) Rust CLI입니다. 설치된 도구는 업데이트하고, 미설치 도구는 동의를 받아 설치하며, 작업이 끝나면 각 도구를 재검증합니다(`command -v`가 아니라 `--version`이 실제로 도는지 확인해 깨진 설치를 잡아냅니다).
 
 **현재 상태: 릴리스됨.** `list`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 테스트 87개와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
 
@@ -92,7 +92,7 @@ RUN sync-ai-clis --yes --only claude,gemini
 
 ## 사용법
 
-[SPEC.md](./SPEC.md) §6에서 확정한 계약 그대로 구현되어 있습니다:
+[SPEC.md](./SPEC.md) §6에서 확정한 계약 그대로 구현했습니다:
 
 ```text
 sync-ai-clis                 # 기본: 설치된 건 업데이트, 미설치는 "설치할까요?(y/N)"
@@ -109,10 +109,10 @@ sync-ai-clis --json          # 자동화용 JSON 요약
 
 ## 신뢰 모델
 
-이 도구는 원격 공식 설치기(`curl | bash`, `irm | iex`)와 패키지 매니저 명령을 실행하므로 보안 규칙을 설계로 명시합니다([SPEC.md](./SPEC.md) §5.5):
+이 도구는 원격 공식 설치기(`curl | bash`, `irm | iex`)와 패키지 매니저 명령을 실행하므로 보안 규칙을 설계에 못박아 둡니다([SPEC.md](./SPEC.md) §5.5):
 
-- 설치/업데이트 URL은 도구 레지스트리에 **하드코딩된 공식 HTTPS 상수만** 사용합니다 — config나 플래그로 임의 URL을 주입할 수 없습니다.
-- 미설치 도구 설치에는 **동의**가 필요합니다: 대화형 프롬프트 또는 명시적 `--yes`.
+- 설치/업데이트 URL은 도구 레지스트리에 **하드코딩된 공식 HTTPS 상수만** 씁니다 — config나 플래그로 임의 URL을 주입할 수 없습니다.
+- 미설치 도구를 설치하려면 **동의**가 필요합니다: 대화형 프롬프트 또는 명시적 `--yes`.
 - `--dry-run`은 실제 실행될 명령을 **그대로** 출력합니다.
 - **자동 권한 상승 없음** — 스스로 sudo/UAC 승격을 하지 않습니다.
 
@@ -137,13 +137,13 @@ cargo run -- --dry-run     # 실행될 명령만 그대로 출력, 실행 없음
 docker/run-matrix.sh       # 실제 설치/업데이트 통합 (일회용 컨테이너에서만)
 ```
 
-확정 결정·아키텍처·도구별 명령 매트릭스·테스트 전략 등 설계 근거는 [SPEC.md](./SPEC.md)에 있습니다. 실제 설치/업데이트는 개발 머신에서 절대 실행하지 않습니다 — Docker 매트릭스와 CI 러너가 그 역할을 합니다.
+확정 결정·아키텍처·도구별 명령 매트릭스·테스트 전략 등 설계 근거는 [SPEC.md](./SPEC.md)에 있습니다. 실제 설치/업데이트는 개발 머신에서 절대 실행하지 않습니다 — Docker 매트릭스와 CI 러너가 그 역할을 맡습니다.
 
 ## 알려진 제약
 
-- **Windows의 Kiro**: Windows 11이 필요하고, 공식 설치 명령이 업스트림에서 아직 확정되지 않아 URL을 추측하는 대신 명확한 SKIP으로 처리합니다 (이미 설치된 `kiro-cli`의 self-update는 정상 동작). [SPEC.md](./SPEC.md) §11에서 추적.
-- **Alpine/musl**: sync-ai-clis 바이너리 자체는 musl에서 동작하지만, 대부분의 업스트림 설치기가 아직 musl 빌드를 제공하지 않습니다.
-- **config `[channels]` 오버라이드**는 파싱은 되지만 아직 채널 선택에 적용되지 않습니다.
+- **Windows의 Kiro**: Windows 11이 필요하고, 공식 설치 명령이 업스트림에서 아직 확정되지 않아 URL을 추측하는 대신 명확한 SKIP으로 처리합니다 (이미 설치된 `kiro-cli`의 self-update는 정상 동작). [SPEC.md](./SPEC.md) §11에서 추적합니다.
+- **Alpine/musl**: sync-ai-clis 바이너리 자체는 musl에서 동작하지만, 업스트림 설치기 대부분이 아직 musl 빌드를 제공하지 않습니다.
+- **config `[channels]` 오버라이드**는 파싱은 되지만 아직 채널 선택에 반영되지 않습니다.
 
 ## 운영 신호
 
