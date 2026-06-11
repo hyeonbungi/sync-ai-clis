@@ -2,6 +2,13 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.2.1 - 2026-06-11
+
+### Fixed
+
+- npm updates now run through the npm that owns the existing install (resolved from the install's real location and invoked by absolute path). A bare `npm install -g` resolves to whichever npm is active — under nvm that meant installing a second copy into a different prefix instead of updating. `--dry-run` shows the exact invocation.
+- Homebrew formulas that vendor npm packages inside their Cellar (e.g. `gemini-cli`) are classified as brew installs again: Cellar/Caskroom paths now take precedence over the `node_modules` marker, so these tools update via `brew upgrade` instead of npm. npm globals installed through a brew-managed Node still classify as npm.
+
 ## 0.2.0 - 2026-06-11
 
 ### Added

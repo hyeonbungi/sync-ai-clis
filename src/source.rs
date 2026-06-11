@@ -50,22 +50,23 @@ pub fn find_all_in_path_env(bin: &str, path_var: &OsStr) -> Vec<PathBuf> {
 }
 
 /// Classifies how a binary was installed from its **resolved** path.
-/// Order matters: npm globals installed through a brew-managed Node live
-/// under the Homebrew prefix but resolve into `node_modules`, so the npm
-/// marker wins over brew markers.
+/// Order matters twice over: Cellar/Caskroom store paths are definitive
+/// (brew formulas may vendor npm packages inside the Cellar — gemini-cli
+/// does — and updating those through npm creates a duplicate, SPEC §11);
+/// below the store level, npm globals installed through a brew-managed
+/// Node live under the bare Homebrew prefix but resolve into
+/// `node_modules`, so there the npm marker wins over the prefix markers.
 pub fn classify_path(resolved_path: &str) -> InstallSource {
     let normalized = resolved_path.to_ascii_lowercase().replace('\\', "/");
-    if normalized.contains("/node_modules/") {
+    if normalized.contains("/cellar/") || normalized.contains("/caskroom/") {
+        InstallSource::Brew
+    } else if normalized.contains("/node_modules/") {
         InstallSource::Npm
     } else if normalized.contains("/scoop/") {
         InstallSource::Scoop
     } else if normalized.contains("/winget/") {
         InstallSource::Winget
-    } else if normalized.contains("/cellar/")
-        || normalized.contains("/caskroom/")
-        || normalized.contains("homebrew")
-        || normalized.contains("linuxbrew")
-    {
+    } else if normalized.contains("homebrew") || normalized.contains("linuxbrew") {
         InstallSource::Brew
     } else {
         InstallSource::Native
@@ -77,6 +78,45 @@ pub fn classify_path(resolved_path: &str) -> InstallSource {
 pub fn detect_from_path(path: &Path) -> InstallSource {
     let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     classify_path(&resolved.to_string_lossy())
+}
+
+/// The npm executable that owns an npm-global install, resolved from the
+/// installed binary's real location: `<prefix>/lib/node_modules/…` pairs
+/// with `<prefix>/bin/npm` (unix), `<prefix>/node_modules/…` with
+/// `<prefix>/npm.cmd` (windows). `npm install -g` through any *other* npm
+/// lands in that npm's own prefix (nvm setups) and creates a duplicate
+/// instead of an update (SPEC §11, found live 2026-06-11). None when the
+/// layout doesn't match — callers fall back to plain `npm`.
+pub fn owning_npm(bin_path: &Path) -> Option<PathBuf> {
+    let resolved = std::fs::canonicalize(bin_path).unwrap_or_else(|_| bin_path.to_path_buf());
+    for ancestor in resolved.ancestors() {
+        if ancestor
+            .file_name()
+            .is_none_or(|name| name != "node_modules")
+        {
+            continue;
+        }
+        let Some(holder) = ancestor.parent() else {
+            continue;
+        };
+        // unix layout: <prefix>/lib/node_modules → <prefix>/bin/npm
+        if holder.file_name().is_some_and(|name| name == "lib")
+            && let Some(prefix) = holder.parent()
+        {
+            let npm = prefix.join("bin").join("npm");
+            if npm.is_file() {
+                return Some(npm);
+            }
+        }
+        // windows layout: <prefix>/node_modules → npm.cmd beside it
+        for name in ["npm.cmd", "npm"] {
+            let npm = holder.join(name);
+            if npm.is_file() {
+                return Some(npm);
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -110,6 +150,77 @@ mod tests {
             classify_path("/usr/local/lib/node_modules/@openai/codex/bin/codex.js"),
             InstallSource::Npm
         );
+    }
+
+    #[test]
+    fn formula_and_cask_store_paths_beat_vendored_node_modules() {
+        // gemini-cli's brew formula vendors the npm package inside its
+        // Cellar — the store path is definitive, and updating through npm
+        // would create a second copy instead (SPEC §11, found live).
+        assert_eq!(
+            classify_path(
+                "/opt/homebrew/Cellar/gemini-cli/0.45.2/libexec/lib/node_modules/@google/gemini-cli/bundle/gemini.js"
+            ),
+            InstallSource::Brew
+        );
+        assert_eq!(
+            classify_path("/opt/homebrew/Caskroom/sometool/1.0/payload/node_modules/cli.js"),
+            InstallSource::Brew
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn owning_npm_resolves_the_prefix_that_holds_the_install() {
+        // unix npm layout: <prefix>/lib/node_modules/<pkg> ↔ <prefix>/bin/npm
+        let root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("sync-own-npm-{}", std::process::id()));
+        let store = root.join("prefix/lib/node_modules/footool/bin");
+        std::fs::create_dir_all(&store).unwrap();
+        let target = store.join("footool.js");
+        std::fs::write(&target, "// stub").unwrap();
+        let bin_dir = root.join("prefix/bin");
+        std::fs::create_dir_all(&bin_dir).unwrap();
+        std::fs::write(bin_dir.join("npm"), "#!/bin/sh\n").unwrap();
+        let shim = bin_dir.join("footool");
+        std::os::unix::fs::symlink(&target, &shim).unwrap();
+
+        assert_eq!(owning_npm(&shim), Some(bin_dir.join("npm")));
+
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn owning_npm_handles_the_windows_flat_layout() {
+        // windows npm layout: <prefix>/node_modules/<pkg> with npm.cmd
+        // sitting directly in <prefix>.
+        let root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("sync-own-npm-win-{}", std::process::id()));
+        let store = root.join("npmprefix/node_modules/footool");
+        std::fs::create_dir_all(&store).unwrap();
+        let target = store.join("footool.js");
+        std::fs::write(&target, "// stub").unwrap();
+        std::fs::write(root.join("npmprefix/npm.cmd"), "stub").unwrap();
+
+        assert_eq!(owning_npm(&target), Some(root.join("npmprefix/npm.cmd")));
+
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn owning_npm_is_none_outside_node_modules() {
+        let root = std::env::temp_dir().join(format!("sync-own-none-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let plain = root.join("agy");
+        std::fs::write(&plain, "stub").unwrap();
+
+        assert_eq!(owning_npm(&plain), None);
+
+        std::fs::remove_dir_all(&root).ok();
     }
 
     #[test]

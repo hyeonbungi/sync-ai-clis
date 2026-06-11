@@ -60,6 +60,34 @@ pub fn all_ok(reports: &[ToolReport]) -> bool {
     reports.iter().all(|r| r.outcome != Outcome::Fail)
 }
 
+/// npm updates must run through the npm that owns the existing install —
+/// any other npm (nvm setups) installs into its own prefix and creates a
+/// duplicate instead of an update (SPEC §11, found live 2026-06-11).
+/// Rewriting happens before commands are rendered, so --dry-run shows the
+/// real invocation (SPEC §5.5). Falls back to plain `npm` when the owner
+/// cannot be resolved.
+fn pin_npm_owner(
+    cmds: Vec<Command>,
+    installed_source: source::InstallSource,
+    bin_path: &std::path::Path,
+) -> Vec<Command> {
+    if installed_source != source::InstallSource::Npm {
+        return cmds;
+    }
+    let Some(owner) = source::owning_npm(bin_path) else {
+        return cmds;
+    };
+    let owner = owner.to_string_lossy().into_owned();
+    cmds.into_iter()
+        .map(|mut cmd| {
+            if cmd.program == "npm" {
+                cmd.program = owner.clone();
+            }
+            cmd
+        })
+        .collect()
+}
+
 /// The engine with every effect injected. `probe` performs read-only
 /// captures (`--version`) and must stay a real runner even under --dry-run;
 /// `exec` performs mutations and is the dry-run switch point.
@@ -127,7 +155,7 @@ impl Engine<'_> {
         };
 
         let cmds = match (tool.update)(self.os, installed_source) {
-            Support::Supported(cmds) => cmds,
+            Support::Supported(cmds) => pin_npm_owner(cmds, installed_source, path),
             Support::Unsupported(reason) => {
                 report.outcome = Outcome::Skip;
                 report.reason = Some(reason.to_string());
@@ -160,7 +188,7 @@ impl Engine<'_> {
         }
 
         if let Some(hook) = tool.on_broken {
-            let recovery = hook(self.os, installed_source);
+            let recovery = pin_npm_owner(hook(self.os, installed_source), installed_source, path);
             report
                 .commands
                 .extend(recovery.iter().map(|c| c.to_string()));
@@ -364,6 +392,62 @@ mod tests {
             };
             engine.sync_tool(tool)
         }
+    }
+
+    /// npm-channel fixture for the owning-npm pin behavior.
+    fn npm_footool() -> ToolSpec {
+        ToolSpec {
+            update: |_, source| match source {
+                crate::source::InstallSource::Npm => Supported(vec![Command::new(
+                    "npm",
+                    &["install", "-g", "footool@latest"],
+                )]),
+                _ => Unsupported("npm-only fixture"),
+            },
+            ..footool()
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn npm_updates_are_pinned_to_the_owning_npm() {
+        // nvm-style setups: a bare `npm i -g` resolves to whichever npm is
+        // active and installs into that npm's own prefix — a duplicate, not
+        // an update (SPEC §11, found live). The engine must run the npm
+        // that owns the existing install.
+        let root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("sync-engine-npm-{}", std::process::id()));
+        let store = root.join("prefix/lib/node_modules/footool/bin");
+        std::fs::create_dir_all(&store).unwrap();
+        std::fs::write(store.join("footool.js"), "// stub").unwrap();
+        let bin_dir = root.join("prefix/bin");
+        std::fs::create_dir_all(&bin_dir).unwrap();
+        std::fs::write(bin_dir.join("npm"), "#!/bin/sh\n").unwrap();
+        let shim = bin_dir.join("footool");
+        std::os::unix::fs::symlink(store.join("footool.js"), &shim).unwrap();
+
+        let pinned = format!(
+            "{} install -g footool@latest",
+            bin_dir.join("npm").display()
+        );
+        let mut fx = Fixture::new();
+        fx.probe.script_capture("footool --version", true, "1.0");
+        fx.probe.script_capture("footool --version", true, "1.1");
+        let report = fx.sync(&npm_footool(), Some(shim.to_str().unwrap()));
+
+        assert_eq!(report.outcome, Outcome::Ok);
+        assert!(fx.exec.saw(&pinned), "calls: {:?}", fx.exec.calls);
+        assert!(
+            !fx.exec.saw("npm install -g footool@latest"),
+            "a bare npm must not run: {:?}",
+            fx.exec.calls
+        );
+        // The report (and therefore --dry-run) shows the real command.
+        assert_eq!(report.commands, vec![pinned]);
+
+        std::fs::remove_dir_all(&root).ok();
     }
 
     #[test]
