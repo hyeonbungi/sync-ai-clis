@@ -2,6 +2,16 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.1.3 - 2026-06-11
+
+### Documentation
+
+- README refresh in both languages, now shipped to the crates.io and npm landing pages (they render the README bundled at publish time): live channel badges, a terminal demo of `--dry-run`, tighter prose, and a simpler tagline.
+
+### Fixed
+
+- The WinGet publish workflow passes the release tag explicitly; it previously resolved to the default branch and could not find the release.
+
 ## 0.1.2 - 2026-06-11
 
 ### Changed
