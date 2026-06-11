@@ -39,7 +39,7 @@ pub struct Cli {
     pub dry_run: bool,
 
     /// Emit the summary as JSON (automation-friendly)
-    #[arg(long)]
+    #[arg(long, global = true)] // also legal after subcommands: `doctor --json`
     pub json: bool,
 
     #[command(subcommand)]
@@ -51,6 +51,8 @@ pub enum Subcmd {
     /// Show known tools with installed state and current version
     #[command(alias = "status")]
     List,
+    /// Diagnose broken, duplicate, or shadowed installs (read-only)
+    Doctor,
 }
 
 /// Flags win over config; config pins the non-interactive default
@@ -135,6 +137,11 @@ mod tests {
     fn list_subcommand_has_status_alias() {
         assert_eq!(parse(&["list"]).command, Some(Subcmd::List));
         assert_eq!(parse(&["status"]).command, Some(Subcmd::List));
+    }
+
+    #[test]
+    fn doctor_subcommand_parses() {
+        assert_eq!(parse(&["doctor"]).command, Some(Subcmd::Doctor));
     }
 
     #[test]

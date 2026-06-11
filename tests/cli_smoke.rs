@@ -76,6 +76,32 @@ fn dry_run_json_emits_spec_schema_without_executing() {
 }
 
 #[test]
+fn doctor_json_emits_diagnosis_schema_read_only() {
+    // Read-only: doctor only probes --version, never installs or updates.
+    let out = bin().args(["doctor", "--json"]).output().unwrap();
+    assert!(
+        matches!(out.status.code(), Some(0) | Some(1)),
+        "doctor exits 0 (clean) or 1 (issues found), got {:?}",
+        out.status.code()
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let value: serde_json::Value =
+        serde_json::from_str(stdout.trim()).unwrap_or_else(|e| panic!("bad json ({e}): {stdout}"));
+    let rows = value.as_array().unwrap();
+    assert_eq!(rows.len(), 5, "all five tools diagnosed");
+    for row in rows {
+        for key in ["id", "display", "status", "locations", "advice"] {
+            assert!(row.get(key).is_some(), "row missing {key}: {row}");
+        }
+        let status = row["status"].as_str().unwrap();
+        assert!(
+            ["ok", "missing", "duplicates", "broken", "not-on-path"].contains(&status),
+            "unexpected status: {status}"
+        );
+    }
+}
+
+#[test]
 fn list_shows_all_known_tools_read_only() {
     let out = bin().arg("list").output().unwrap();
     assert!(out.status.success());

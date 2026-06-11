@@ -28,17 +28,25 @@ pub fn find_in_path(bin: &str) -> Option<PathBuf> {
 /// PATH-injectable lookup so the search order is testable without mutating
 /// process env (env mutation is unsafe in edition 2024).
 pub fn find_in_path_env(bin: &str, path_var: &OsStr) -> Option<PathBuf> {
+    find_all_in_path_env(bin, path_var).into_iter().next()
+}
+
+/// Every PATH match in search order (one per directory) — `doctor` needs the
+/// shadowed copies that `find_in_path_env` skips past.
+pub fn find_all_in_path_env(bin: &str, path_var: &OsStr) -> Vec<PathBuf> {
+    let mut matches = Vec::new();
     for dir in std::env::split_paths(path_var) {
         if dir.as_os_str().is_empty() {
             continue;
         }
-        for candidate in [dir.join(bin), dir.join(format!("{bin}.exe"))] {
-            if candidate.is_file() {
-                return Some(candidate);
-            }
+        if let Some(hit) = [dir.join(bin), dir.join(format!("{bin}.exe"))]
+            .into_iter()
+            .find(|candidate| candidate.is_file())
+        {
+            matches.push(hit);
         }
     }
-    None
+    matches
 }
 
 /// Classifies how a binary was installed from its **resolved** path.
@@ -127,6 +135,26 @@ mod tests {
             InstallSource::Native
         );
         assert_eq!(classify_path(""), InstallSource::Native);
+    }
+
+    #[test]
+    fn finds_every_path_match_in_order() {
+        let root = std::env::temp_dir().join(format!("sync-ai-clis-all-{}", std::process::id()));
+        let (first, second) = (root.join("a"), root.join("b"));
+        std::fs::create_dir_all(&first).unwrap();
+        std::fs::create_dir_all(&second).unwrap();
+        std::fs::write(first.join("footool"), "#!/bin/sh\n").unwrap();
+        std::fs::write(second.join("footool"), "#!/bin/sh\n").unwrap();
+
+        let path_var = std::env::join_paths([first.clone(), second.clone()]).unwrap();
+        assert_eq!(
+            find_all_in_path_env("footool", &path_var),
+            vec![first.join("footool"), second.join("footool")],
+            "every match, PATH order"
+        );
+        assert!(find_all_in_path_env("missing-tool", &path_var).is_empty());
+
+        std::fs::remove_dir_all(&root).ok();
     }
 
     #[test]

@@ -2,6 +2,16 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.2.0 - 2026-06-11
+
+### Added
+
+- `sync-ai-clis doctor`: read-only diagnosis of unhealthy installs. Scans every PATH entry plus each tool's known install directory and reports duplicate installs (every copy with its install source and version, the copy PATH picks first, and a warning when an older copy shadows a newer one), broken installs (`--version` fails), and installed-but-not-on-PATH cases. Missing tools are informational. Exit 1 when issues are found, 0 when clean; supports `--json`.
+
+### Changed
+
+- `--json` is now a global flag, so it can follow subcommands: `sync-ai-clis doctor --json`.
+
 ## 0.1.3 - 2026-06-11
 
 ### Documentation

@@ -8,6 +8,7 @@ use clap::Parser;
 
 use sync_ai_clis::cli::{self, Cli, Subcmd};
 use sync_ai_clis::config;
+use sync_ai_clis::doctor;
 use sync_ai_clis::engine::{self, Engine};
 use sync_ai_clis::os::OsInfo;
 use sync_ai_clis::report;
@@ -42,8 +43,11 @@ fn run() -> i32 {
         return 1;
     };
 
-    if let Some(Subcmd::List) = cli.command {
-        return list(&tools);
+    // Exhaustive on purpose: a new subcommand must be wired here to compile.
+    match cli.command {
+        Some(Subcmd::List) => return list(&tools),
+        Some(Subcmd::Doctor) => return doctor_cmd(&tools, &os, cli.json),
+        None => {}
     }
 
     let policy = cli::install_policy(cli.yes, cli.no_install, &config);
@@ -98,6 +102,34 @@ fn run() -> i32 {
         anstream::println!("{}", report::summary_table(&reports, true, cli.dry_run));
     }
     if engine::all_ok(&reports) { 0 } else { 1 }
+}
+
+/// `doctor`: read-only diagnosis of broken/duplicate/shadowed installs
+/// (SPEC §6.1/§6.3). Exit 1 when issues are found, 0 when clean.
+fn doctor_cmd(tools: &[ToolSpec], os: &OsInfo, json: bool) -> i32 {
+    let mut probe = RealRunner::interactive();
+    let path_var = std::env::var_os("PATH").unwrap_or_default();
+    let diagnoses: Vec<_> = tools
+        .iter()
+        .map(|tool| doctor::diagnose(tool, os, &path_var, &mut probe))
+        .collect();
+
+    if json {
+        println!("{}", doctor::json_doctor(&diagnoses));
+    } else {
+        for diagnosis in &diagnoses {
+            anstream::println!("\n{}", doctor::render(diagnosis));
+        }
+        anstream::println!(
+            "\n{}",
+            if doctor::has_issues(&diagnoses) {
+                "Problems found — see the advice lines above."
+            } else {
+                "No problems found."
+            }
+        );
+    }
+    if doctor::has_issues(&diagnoses) { 1 } else { 0 }
 }
 
 /// `list` / `status`: read-only table of known tools (SPEC §6.1).
