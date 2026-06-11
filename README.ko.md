@@ -32,7 +32,7 @@
   <a href="./README.md">English</a> | 한국어
 </p>
 
-> 여러 AI 코딩 CLI(Claude Code · Codex · Gemini · Kiro · Antigravity)를 한 명령으로 감지·설치·최신 유지. "AI CLI를 위한 rustup."
+> 여러 AI 코딩 CLI(Claude Code · Codex · Gemini · Kiro · Antigravity)를 한 명령으로 감지·설치·최신 유지.
 
 <p align="center">
   <img alt="sync-ai-clis --dry-run 출력: 도구별 감지된 설치 채널과 실제 실행될 명령" src="https://raw.githubusercontent.com/hyeonbungi/sync-ai-clis/main/.github/assets/terminal-demo.svg" width="600">
