@@ -4,7 +4,7 @@
 | 항목 | 값 |
 |------|-----|
 | 프로젝트명 | **sync-ai-clis** |
-| 한 줄 설명 | 여러 AI 코딩 CLI(Claude Code·Codex·Gemini·Kiro·Antigravity)를 한 명령으로 **감지·설치·최신 유지**하는 크로스플랫폼 도구 ("rustup인데 AI CLI용") |
+| 한 줄 설명 | 여러 AI 코딩 CLI(Claude Code·Codex·Gemini·Kiro·Antigravity)를 한 명령으로 **감지·설치·최신 유지**하는 크로스플랫폼 도구 ("AI CLI를 위한 rustup") |
 | 구현 언어 | **Rust** (단일 바이너리) |
 | 지원 OS | **macOS · Windows · Linux** |
 | 라이선스 | **MIT** |
