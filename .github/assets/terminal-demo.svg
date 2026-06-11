@@ -1,5 +1,5 @@
 <svg viewBox="0 0 600 508" width="600" height="508" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="sync-ai-clis --dry-run terminal demo">
-  <!-- Real v0.1.2 `sync-ai-clis --dry-run` output (Kiro/Antigravity sections elided). -->
+  <!-- Real v0.1.2 dry-run output of sync-ai-clis (Kiro/Antigravity sections elided). -->
   <style>
     .t { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; fill: #e6edf3; white-space: pre; }
     .ti { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; fill: #8b949e; }
