@@ -1,16 +1,30 @@
 # sync-ai-clis
 
 <p align="center">
-  <a href="https://crates.io/crates/sync-ai-clis">
-    <img alt="crates.io" src="https://img.shields.io/crates/v/sync-ai-clis?style=flat-square&color=2f80ed">
-  </a>
-  <img alt="Stack: Rust" src="https://img.shields.io/badge/stack-Rust-dea584?style=flat-square">
-  <img alt="Platforms: macOS, Windows, Linux" src="https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-44cc11?style=flat-square">
   <a href="https://github.com/hyeonbungi/sync-ai-clis/actions/workflows/ci.yml">
-    <img alt="CI" src="https://github.com/hyeonbungi/sync-ai-clis/actions/workflows/ci.yml/badge.svg">
+    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/hyeonbungi/sync-ai-clis/ci.yml?branch=main&style=flat-square&label=CI">
   </a>
+  <a href="https://github.com/hyeonbungi/sync-ai-clis/releases/latest">
+    <img alt="GitHub release" src="https://img.shields.io/github/v/release/hyeonbungi/sync-ai-clis?style=flat-square&label=release&color=2f80ed">
+  </a>
+  <img alt="Platforms: macOS, Windows, Linux" src="https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-44cc11?style=flat-square">
   <a href="./LICENSE">
     <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-111827?style=flat-square">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://crates.io/crates/sync-ai-clis">
+    <img alt="crates.io" src="https://img.shields.io/crates/v/sync-ai-clis?style=flat-square&logo=rust&logoColor=white&label=crates.io&color=2f80ed">
+  </a>
+  <a href="https://www.npmjs.com/package/sync-ai-clis">
+    <img alt="npm" src="https://img.shields.io/npm/v/sync-ai-clis?style=flat-square&label=npm&color=2f80ed">
+  </a>
+  <a href="https://github.com/hyeonbungi/scoop-bucket">
+    <img alt="Scoop" src="https://img.shields.io/scoop/v/sync-ai-clis?bucket=https%3A%2F%2Fgithub.com%2Fhyeonbungi%2Fscoop-bucket&style=flat-square&label=scoop&color=2f80ed">
+  </a>
+  <a href="https://github.com/hyeonbungi/sync-ai-clis/pkgs/container/sync-ai-clis">
+    <img alt="ghcr.io container" src="https://img.shields.io/badge/ghcr.io-container-2f80ed?style=flat-square&logo=docker&logoColor=white">
   </a>
 </p>
 
@@ -20,9 +34,13 @@
 
 > One command to detect, install, and keep your AI coding CLIs up to date — Claude Code, Codex, Gemini, Kiro, and Antigravity. "rustup, but for AI CLIs."
 
+<p align="center">
+  <img alt="sync-ai-clis --dry-run: every tool, its detected install channel, and the exact commands that would run" src="https://raw.githubusercontent.com/hyeonbungi/sync-ai-clis/main/.github/assets/terminal-demo.svg" width="600">
+</p>
+
 `sync-ai-clis` is a cross-platform (macOS · Windows · Linux) Rust CLI that reconciles your machine toward "every known AI CLI installed, working, and current": installed tools get updated, missing tools are installed after consent, and each tool is re-verified after the work (`--version` must actually run, catching broken installs — not just `command -v`).
 
-**Current status: released.** `list`, `--dry-run`, and consent-based install/update all work, verified by 84 tests plus real-channel runs on Linux containers, macOS, and Windows CI. The full design — confirmed decisions, architecture, per-tool install/update matrix, test and release strategy — lives in [SPEC.md](./SPEC.md), the single source of truth for this repository.
+**Current status: released.** `list`, `--dry-run`, and consent-based install/update all work, verified by 87 tests plus real-channel runs on Linux containers, macOS, and Windows CI. The full design — confirmed decisions, architecture, per-tool install/update matrix, test and release strategy — lives in [SPEC.md](./SPEC.md), the single source of truth for this repository.
 
 ## At A Glance
 
@@ -32,9 +50,9 @@
 | Managed tools (v1) | `claude`, `codex`, `gemini`, `kiro-cli`, `agy` |
 | Platforms | macOS · Windows · Linux |
 | Stack | Rust (single binary) |
-| Status | Released — engine verified on all three OSes (84 offline tests + real-channel CI) |
-| Distribution | GitHub Releases · Homebrew tap · npm · crates.io · winget · Scoop |
-| Tests | 84 offline tests + Docker distro matrix + 3-OS CI with real-channel runs |
+| Status | Released — engine verified on all three OSes (87 offline tests + real-channel CI) |
+| Distribution | GitHub Releases · Homebrew tap · npm · crates.io · winget · Scoop · ghcr (Docker) |
+| Tests | 87 offline tests + Docker distro matrix + 3-OS CI with real-channel runs |
 | License | [MIT](./LICENSE) |
 | Author | [hyeonbungi](https://github.com/hyeonbungi) |
 
@@ -112,7 +130,7 @@ This tool executes remote official installers (`curl | bash`, `irm | iex`) and p
 ## Development
 
 ```bash
-cargo test                 # 84 offline tests — no network, no system changes
+cargo test                 # 87 offline tests — no network, no system changes
 cargo fmt --check && cargo clippy --all-targets -- -D warnings
 cargo run -- list          # read-only: detect tools and show versions
 cargo run -- --dry-run     # show exactly what a sync would run, execute nothing
