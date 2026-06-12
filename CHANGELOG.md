@@ -2,6 +2,16 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.2.2 - 2026-06-12
+
+### Fixed
+
+- `--only` and `--except` are now global flags, matching `--json`, so filters work after subcommands such as `sync-ai-clis doctor --only gemini --json`.
+- Config `[channels]` overrides are now validated and applied to installed-tool update planning. Unknown tool IDs or channel names fail fast with usage error exit 2. Missing-tool installs and `doctor` diagnostics still use the real detected state.
+- Codex native installs now update with the official `codex update` command. Installer reruns remain the install and broken-binary recovery path.
+- Kiro Windows 11 installs now use the confirmed official PowerShell installer, and native Kiro updates run `kiro-cli update --non-interactive`.
+- Codex and Kiro now have confirmed `install_dir` values for PATH-refresh rechecks. Gemini is explicitly left without a fixed `install_dir` because npm and Homebrew prefixes vary by installation.
+
 ## 0.2.1 - 2026-06-11
 
 ### Fixed
