@@ -40,7 +40,7 @@
 
 `sync-ai-clis`는 머신을 "알려진 AI CLI가 전부 설치되어 있고, 동작하고, 최신인 상태"로 맞추는(reconcile) 크로스플랫폼(macOS · Windows · Linux) Rust CLI입니다. 설치된 도구는 업데이트하고, 미설치 도구는 동의를 받아 설치하며, 작업이 끝나면 각 도구를 재검증합니다(`command -v`가 아니라 `--version`이 실제로 도는지 확인해 깨진 설치를 잡아냅니다).
 
-**현재 상태: 릴리스됨.** `list`·`doctor`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 테스트 116개와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
+**현재 상태: 릴리스됨.** `list`·`doctor`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 테스트 120개와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
 
 ## At A Glance
 
@@ -50,9 +50,9 @@
 | 관리 도구 (v1) | `claude`, `codex`, `gemini`, `kiro-cli`, `agy` |
 | 플랫폼 | macOS · Windows · Linux |
 | 스택 | Rust (단일 바이너리) |
-| 상태 | 릴리스됨 — 3 OS 전부에서 엔진 검증 (오프라인 테스트 116개 + 실채널 CI) |
+| 상태 | 릴리스됨 — 3 OS 전부에서 엔진 검증 (오프라인 테스트 120개 + 실채널 CI) |
 | 배포 | GitHub Releases · Homebrew tap · npm · crates.io · winget · Scoop · ghcr (Docker) |
-| 테스트 | 오프라인 116개 + Docker 배포판 매트릭스 + 3 OS 실채널 CI |
+| 테스트 | 오프라인 120개 + Docker 배포판 매트릭스 + 3 OS 실채널 CI |
 | 라이선스 | [MIT](./LICENSE) |
 | 저작자 | [hyeonbungi](https://github.com/hyeonbungi) |
 
@@ -133,7 +133,7 @@ sync-ai-clis --json          # 자동화용 JSON 요약
 ## 개발
 
 ```bash
-cargo test                 # 오프라인 테스트 116개 — 네트워크·시스템 변경 없음
+cargo test                 # 오프라인 테스트 120개 — 네트워크·시스템 변경 없음
 cargo fmt --check && cargo clippy --all-targets -- -D warnings
 cargo run -- list          # 읽기 전용: 도구 감지·버전 표
 cargo run -- --dry-run     # 실행될 명령만 그대로 출력, 실행 없음
@@ -144,7 +144,7 @@ docker/run-matrix.sh       # 실제 설치/업데이트 통합 (일회용 컨테
 
 ## 알려진 제약
 
-- **Windows의 Kiro**: Windows 11이 필요하고, 공식 설치 명령이 업스트림에서 아직 확정되지 않아 URL을 추측하는 대신 명확한 SKIP으로 처리합니다 (이미 설치된 `kiro-cli`의 self-update는 정상 동작). [SPEC.md](./SPEC.md) §11에서 추적합니다.
+- **Windows의 Kiro**: Windows 11이 필요합니다. 명령 선택은 오프라인으로 검증하고, 전체 데스크톱 설치 검증은 개발 머신이 아니라 Windows CI나 일회용 VM에서 다룹니다.
 - **Alpine/musl**: sync-ai-clis 바이너리 자체는 musl에서 동작하지만, 업스트림 설치기 대부분이 아직 musl 빌드를 제공하지 않습니다.
 - **config `[channels]` 오버라이드**는 업데이트 계획에만 적용됩니다. 미설치 도구 설치와 `doctor` 진단은 실제 감지 상태를 그대로 봅니다.
 

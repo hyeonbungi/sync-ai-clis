@@ -109,7 +109,7 @@ fn codex_missing_on_linux_installs_via_native_installer() {
 }
 
 #[test]
-fn codex_updates_by_source_and_falls_back_to_installer_rerun() {
+fn codex_updates_by_source_and_uses_native_self_update() {
     let tool = spec("codex");
     assert_eq!(
         rendered((tool.update)(&macos(), InstallSource::Brew)),
@@ -125,10 +125,10 @@ fn codex_updates_by_source_and_falls_back_to_installer_rerun() {
         rendered((tool.update)(&macos(), InstallSource::Npm)),
         vec!["npm install -g @openai/codex@latest"]
     );
-    // Native update = rerun the official installer (SPEC §7.2 TODO pending).
+    // Native update = Codex's official self-update command.
     assert_eq!(
         rendered((tool.update)(&macos(), InstallSource::Native)),
-        vec![r#"sh -c "curl -fsSL https://chatgpt.com/codex/install.sh | sh""#]
+        vec!["codex update"]
     );
 }
 
@@ -183,6 +183,13 @@ fn gemini_installs_via_npm_and_has_no_native_channel() {
 }
 
 #[test]
+fn gemini_has_no_fixed_install_dir() {
+    // npm/brew globals vary by package-manager prefix, so a static
+    // post-install recheck path would be a guess.
+    assert!((spec("gemini").install_dir)(&macos()).is_none());
+}
+
+#[test]
 fn kiro_skips_windows_10_with_a_clear_reason() {
     // SPEC §8.1 example: (os=windows10, tool=kiro) → SKIP("Win11 필요").
     let reason = (spec("kiro").install)(&windows(19045))
@@ -192,12 +199,12 @@ fn kiro_skips_windows_10_with_a_clear_reason() {
 }
 
 #[test]
-fn kiro_windows_11_stays_skipped_until_command_is_confirmed() {
-    // SPEC §11 backlog: exact Win11 command unconfirmed — no guessed URLs.
-    assert!(
-        (spec("kiro").install)(&windows(22631))
-            .unsupported_reason()
-            .is_some()
+fn kiro_installs_on_windows_11_with_official_powershell_installer() {
+    assert_eq!(
+        rendered((spec("kiro").install)(&windows(22631))),
+        vec![
+            r#"powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://cli.kiro.dev/install.ps1 | iex""#
+        ]
     );
 }
 
@@ -214,7 +221,7 @@ fn kiro_installs_on_unix_and_self_updates() {
     );
     assert_eq!(
         rendered((tool.update)(&linux_glibc(2, 39), InstallSource::Native)),
-        vec!["kiro-cli update"]
+        vec!["kiro-cli update --non-interactive"]
     );
     assert!(
         (tool.update)(&macos(), InstallSource::Brew)
@@ -281,10 +288,10 @@ fn codex_windows_paths_use_wrapped_powershell() {
     let tool = spec("codex");
     let expected = r#"powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://chatgpt.com/codex/install.ps1 | iex""#;
     assert_eq!(rendered((tool.install)(&windows(22631))), vec![expected]);
-    // Native update = installer rerun, also on Windows.
+    // Native update uses the self-update subcommand on Windows too.
     assert_eq!(
         rendered((tool.update)(&windows(22631), InstallSource::Native)),
-        vec![expected]
+        vec!["codex update"]
     );
     let on_broken = tool.on_broken.expect("codex recovery hook");
     let recovery: Vec<String> = on_broken(&windows(22631), InstallSource::Native)
@@ -307,14 +314,13 @@ fn gemini_brew_update_also_works_on_linux() {
 
 #[test]
 fn kiro_installed_on_windows11_self_updates() {
-    // Install is unconfirmed on Win11, but an already-installed kiro-cli
-    // self-updates fine (SPEC §7.4).
+    // Windows 11 install and update commands are both confirmed in SPEC §7.4.
     assert_eq!(
         rendered((spec("kiro").update)(
             &windows(22631),
             InstallSource::Native
         )),
-        vec!["kiro-cli update"]
+        vec!["kiro-cli update --non-interactive"]
     );
 }
 
@@ -331,6 +337,52 @@ fn self_update_flags_match_spec() {
             ("kiro", true),
             ("antigravity", false),
         ]
+    );
+}
+
+#[test]
+fn codex_knows_standalone_install_dirs_for_path_recheck() {
+    let tool = spec("codex");
+    let unix_dir = (tool.install_dir)(&macos()).expect("codex unix install dir is known");
+    assert!(
+        unix_dir.ends_with(".local/bin"),
+        "dir was: {}",
+        unix_dir.display()
+    );
+
+    let win_dir = (tool.install_dir)(&windows(22631)).expect("codex windows install dir is known");
+    assert!(
+        win_dir.ends_with("Programs/OpenAI/Codex/bin")
+            || win_dir.ends_with(r"Programs\OpenAI\Codex\bin"),
+        "dir was: {}",
+        win_dir.display()
+    );
+}
+
+#[test]
+fn kiro_knows_confirmed_install_dirs_for_path_recheck() {
+    let tool = spec("kiro");
+    let mac_dir = (tool.install_dir)(&macos()).expect("kiro mac install dir is known");
+    assert!(
+        mac_dir.ends_with("Kiro CLI.app/Contents/MacOS")
+            || mac_dir.ends_with(r"Kiro CLI.app\Contents\MacOS"),
+        "dir was: {}",
+        mac_dir.display()
+    );
+
+    let linux_dir =
+        (tool.install_dir)(&linux_glibc(2, 39)).expect("kiro linux install dir is known");
+    assert!(
+        linux_dir.ends_with(".local/bin"),
+        "dir was: {}",
+        linux_dir.display()
+    );
+
+    let win_dir = (tool.install_dir)(&windows(22631)).expect("kiro windows install dir is known");
+    assert!(
+        win_dir.ends_with("Kiro-Cli") || win_dir.ends_with(r"Kiro-Cli"),
+        "dir was: {}",
+        win_dir.display()
     );
 }
 

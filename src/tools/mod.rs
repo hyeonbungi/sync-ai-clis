@@ -44,7 +44,7 @@ pub struct ToolSpec {
     pub bin: &'static str,
     pub version_args: &'static [&'static str],
     /// Known absolute install dir for the PATH-not-yet-refreshed re-check
-    /// after a fresh install (SPEC §5.5). None = not confirmed yet.
+    /// after a fresh install (SPEC §5.5). None = no fixed path is known.
     pub install_dir: fn(&OsInfo) -> Option<PathBuf>,
     /// True when the tool background-self-updates (Claude, Kiro).
     pub self_updates: bool,

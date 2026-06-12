@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::os::OsInfo;
+use crate::os::{Os, OsInfo};
 use crate::runner::{Command, CommandRunner};
 use crate::source;
 use crate::tools::{Support, ToolSpec};
@@ -280,15 +280,16 @@ impl Engine<'_> {
         // Fresh installs may land outside the current PATH (SPEC §5.5):
         // re-check the known install dir before giving advice.
         if let Some(dir) = (tool.install_dir)(self.os) {
-            let absolute = dir.join(tool.bin);
-            let absolute_cmd = Command::new(&absolute.to_string_lossy(), tool.version_args);
-            if let Some(version) = self.capture_version(&absolute_cmd) {
-                report.after = Some(version);
-                report.reason = Some(format!(
-                    "installed at {}; restart your shell to refresh PATH",
-                    dir.display()
-                ));
-                return report;
+            for absolute in install_dir_candidates(self.os, &dir, tool.bin) {
+                let absolute_cmd = Command::new(&absolute.to_string_lossy(), tool.version_args);
+                if let Some(version) = self.capture_version(&absolute_cmd) {
+                    report.after = Some(version);
+                    report.reason = Some(format!(
+                        "installed at {}; restart your shell to refresh PATH",
+                        dir.display()
+                    ));
+                    return report;
+                }
             }
         }
 
@@ -300,6 +301,14 @@ impl Engine<'_> {
         ));
         report
     }
+}
+
+fn install_dir_candidates(os: &OsInfo, dir: &std::path::Path, bin: &str) -> Vec<PathBuf> {
+    let mut candidates = vec![dir.join(bin)];
+    if os.os == Os::Windows {
+        candidates.push(dir.join(format!("{bin}.exe")));
+    }
+    candidates
 }
 
 fn first_line(s: &str) -> String {
@@ -327,6 +336,15 @@ mod tests {
             os: Os::Windows,
             arch: "x86_64".into(),
             windows_build: Some(19045),
+            libc: None,
+        }
+    }
+
+    fn windows11() -> OsInfo {
+        OsInfo {
+            os: Os::Windows,
+            arch: "x86_64".into(),
+            windows_build: Some(22631),
             libc: None,
         }
     }
@@ -722,6 +740,15 @@ mod tests {
         )
     }
 
+    fn fixture_absolute_windows_exe_probe() -> String {
+        format!(
+            "{} --version",
+            PathBuf::from("/fixture/bin")
+                .join("footool.exe")
+                .to_string_lossy()
+        )
+    }
+
     #[test]
     fn fresh_install_rechecks_install_dir_when_path_not_refreshed() {
         // SPEC §5.5: a fresh install may land outside the current PATH.
@@ -730,6 +757,23 @@ mod tests {
         fx.probe.script_capture("footool --version", false, "");
         fx.probe
             .script_capture(&fixture_absolute_probe(), true, "1.0");
+        let report = fx.sync(&footool(), None);
+
+        assert_eq!(report.outcome, Outcome::Ok);
+        assert_eq!(report.after.as_deref(), Some("1.0"));
+        assert!(report.reason.expect("advises").contains("restart"));
+    }
+
+    #[test]
+    fn fresh_install_rechecks_windows_exe_in_install_dir() {
+        let mut fx = Fixture::new();
+        fx.os = windows11();
+        fx.install_policy = InstallPolicy::Always;
+        fx.probe.script_capture("footool --version", false, "");
+        fx.probe
+            .script_capture(&fixture_absolute_probe(), false, "");
+        fx.probe
+            .script_capture(&fixture_absolute_windows_exe_probe(), true, "1.0");
         let report = fx.sync(&footool(), None);
 
         assert_eq!(report.outcome, Outcome::Ok);

@@ -1,9 +1,8 @@
-//! Kiro CLI, AWS (SPEC §7.4). Native self-update (`kiro-cli update`,
-//! background auto-apply). No package-manager channels. Windows requires
-//! Win11, and the exact Windows install command is still unconfirmed
-//! (SPEC §11 backlog) — we skip with a reason rather than guess a URL
-//! (SPEC §5.5: hardcoded verified URLs only). The official installer handles
-//! the glibc≥2.34 vs musl variant on Linux.
+//! Kiro CLI, AWS (SPEC §7.4). Native self-update (`kiro-cli update
+//! --non-interactive`, background auto-apply). No package-manager channels.
+//! Windows requires Win11 and uses the official PowerShell installer.
+//! The official Unix installer handles the glibc≥2.34 vs musl variant on
+//! Linux.
 
 use std::path::PathBuf;
 
@@ -13,6 +12,7 @@ use crate::source::InstallSource;
 use crate::tools::{Support, ToolSpec};
 
 const INSTALL_URL: &str = "https://cli.kiro.dev/install";
+const INSTALL_PS1_URL: &str = "https://cli.kiro.dev/install.ps1";
 
 pub fn spec() -> ToolSpec {
     ToolSpec {
@@ -28,8 +28,22 @@ pub fn spec() -> ToolSpec {
     }
 }
 
-fn install_dir(_os: &OsInfo) -> Option<PathBuf> {
-    None // not confirmed yet (SPEC §11 backlog: install_dir 확정)
+fn install_dir(os: &OsInfo) -> Option<PathBuf> {
+    match os.os {
+        Os::MacOs => Some(
+            PathBuf::from("/Applications")
+                .join("Kiro CLI.app")
+                .join("Contents")
+                .join("MacOS"),
+        ),
+        Os::Linux => dirs::home_dir().map(|home| home.join(".local").join("bin")),
+        Os::Windows => Some(
+            std::env::var_os("ProgramFiles")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from(r"C:\Program Files"))
+                .join("Kiro-Cli"),
+        ),
+    }
 }
 
 fn install(os: &OsInfo) -> Support<Vec<Command>> {
@@ -40,15 +54,18 @@ fn install(os: &OsInfo) -> Support<Vec<Command>> {
         Os::Windows if !os.is_windows_11() => {
             Support::Unsupported("Kiro requires Windows 11 (SPEC §7.4)")
         }
-        Os::Windows => Support::Unsupported(
-            "Kiro Windows install command not confirmed yet (SPEC §11 backlog)",
-        ),
+        Os::Windows => Support::Supported(vec![Command::powershell(&format!(
+            "irm {INSTALL_PS1_URL} | iex"
+        ))]),
     }
 }
 
 fn update(_os: &OsInfo, source: InstallSource) -> Support<Vec<Command>> {
     match source {
-        InstallSource::Native => Support::Supported(vec![Command::new("kiro-cli", &["update"])]),
+        InstallSource::Native => Support::Supported(vec![Command::new(
+            "kiro-cli",
+            &["update", "--non-interactive"],
+        )]),
         _ => Support::Unsupported("Kiro has no package-manager channel (SPEC §7.4)"),
     }
 }

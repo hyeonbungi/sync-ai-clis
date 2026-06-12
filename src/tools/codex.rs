@@ -1,8 +1,7 @@
-//! Codex CLI, OpenAI (SPEC §7.2). No native self-update subcommand confirmed
-//! yet (SPEC §11 backlog) — native updates rerun the official installer.
-//! Keeps the original script's "reinstall when broken" recovery. The npm
-//! package must be the scoped @openai/codex (the unscoped `codex` package is
-//! an unrelated 2012 project).
+//! Codex CLI, OpenAI (SPEC §7.2). Native updates use the official
+//! `codex update` subcommand; the installer rerun remains the install and
+//! broken-binary recovery path. The npm package must be the scoped
+//! @openai/codex (the unscoped `codex` package is an unrelated 2012 project).
 
 use std::path::PathBuf;
 
@@ -28,8 +27,20 @@ pub fn spec() -> ToolSpec {
     }
 }
 
-fn install_dir(_os: &OsInfo) -> Option<PathBuf> {
-    None // not confirmed yet (SPEC §11 backlog: install_dir 확정)
+fn install_dir(os: &OsInfo) -> Option<PathBuf> {
+    if let Some(dir) = std::env::var_os("CODEX_INSTALL_DIR") {
+        return Some(PathBuf::from(dir));
+    }
+
+    match os.os {
+        Os::MacOs | Os::Linux => dirs::home_dir().map(|home| home.join(".local").join("bin")),
+        Os::Windows => windows_local_app_data().map(|base| {
+            base.join("Programs")
+                .join("OpenAI")
+                .join("Codex")
+                .join("bin")
+        }),
+    }
 }
 
 fn install(os: &OsInfo) -> Support<Vec<Command>> {
@@ -41,8 +52,7 @@ fn install(os: &OsInfo) -> Support<Vec<Command>> {
 
 fn update(os: &OsInfo, source: InstallSource) -> Support<Vec<Command>> {
     match source {
-        // Installer rerun until a self-update subcommand is confirmed (SPEC §7.2 TODO).
-        InstallSource::Native => install(os),
+        InstallSource::Native => Support::Supported(vec![Command::new("codex", &["update"])]),
         InstallSource::Brew => match os.os {
             Os::MacOs => {
                 Support::Supported(vec![Command::new("brew", &["upgrade", "--cask", "codex"])])
@@ -57,6 +67,12 @@ fn update(os: &OsInfo, source: InstallSource) -> Support<Vec<Command>> {
             Support::Unsupported("Codex is not distributed via winget/Scoop (SPEC §7.2)")
         }
     }
+}
+
+fn windows_local_app_data() -> Option<PathBuf> {
+    std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|home| home.join("AppData").join("Local")))
 }
 
 /// Inherited from the original script: broken binary → reinstall through the
