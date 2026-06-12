@@ -30,8 +30,15 @@ fn run() -> i32 {
             return 2;
         }
     };
-    let tools = match cli::select_tools(registry(), &cli.only, &cli.except, config.tools.as_deref())
-    {
+    let registry = registry();
+    let channel_overrides = match config::channel_overrides(config.channels.as_ref(), &registry) {
+        Ok(overrides) => overrides,
+        Err(err) => {
+            eprintln!("error: {err}");
+            return 2;
+        }
+    };
+    let tools = match cli::select_tools(registry, &cli.only, &cli.except, config.tools.as_deref()) {
         Ok(tools) => tools,
         Err(err) => {
             eprintln!("error: {err}");
@@ -74,6 +81,7 @@ fn run() -> i32 {
         exec,
         consent: &mut consent,
         install_policy: policy,
+        channel_overrides: &channel_overrides,
         dry_run: cli.dry_run,
     };
 

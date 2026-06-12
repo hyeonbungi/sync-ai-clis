@@ -7,6 +7,7 @@
 //! execution, and the consent prompt — so the whole pipeline is testable
 //! offline (SPEC §8.1/§8.4) and `--dry-run` falls out of the runner choice.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::os::OsInfo;
@@ -98,6 +99,7 @@ pub struct Engine<'a> {
     pub exec: &'a mut dyn CommandRunner,
     pub consent: &'a mut dyn FnMut(&str) -> bool,
     pub install_policy: InstallPolicy,
+    pub channel_overrides: &'a HashMap<String, source::InstallSource>,
     pub dry_run: bool,
 }
 
@@ -142,6 +144,8 @@ impl Engine<'_> {
     fn sync_installed(&mut self, tool: &ToolSpec, path: &std::path::Path) -> ToolReport {
         let version_cmd = Self::version_command(tool);
         let installed_source = source::detect_from_path(path);
+        let configured_source = self.channel_overrides.get(tool.id).copied();
+        let update_source = configured_source.unwrap_or(installed_source);
         let mut report = ToolReport {
             id: tool.id.to_string(),
             display: tool.display.to_string(),
@@ -154,11 +158,17 @@ impl Engine<'_> {
             commands: Vec::new(),
         };
 
-        let cmds = match (tool.update)(self.os, installed_source) {
+        let cmds = match (tool.update)(self.os, update_source) {
             Support::Supported(cmds) => pin_npm_owner(cmds, installed_source, path),
             Support::Unsupported(reason) => {
                 report.outcome = Outcome::Skip;
-                report.reason = Some(reason.to_string());
+                report.reason = Some(match configured_source {
+                    Some(source) => format!(
+                        "configured channel `{}` unsupported: {reason}",
+                        source.channel_name()
+                    ),
+                    None => reason.to_string(),
+                });
                 return report;
             }
         };
@@ -349,6 +359,25 @@ mod tests {
         }
     }
 
+    fn multi_channel_footool() -> ToolSpec {
+        ToolSpec {
+            update: |_, source| match source {
+                crate::source::InstallSource::Native => {
+                    Supported(vec![Command::new("footool", &["update"])])
+                }
+                crate::source::InstallSource::Brew => {
+                    Supported(vec![Command::new("brew", &["upgrade", "footool"])])
+                }
+                crate::source::InstallSource::Npm => Supported(vec![Command::new(
+                    "npm",
+                    &["install", "-g", "footool@latest"],
+                )]),
+                _ => Unsupported("fixture channel unsupported"),
+            },
+            ..footool()
+        }
+    }
+
     struct Fixture {
         os: OsInfo,
         probe: MockRunner,
@@ -356,6 +385,7 @@ mod tests {
         consent_log: Vec<String>,
         consent_answer: bool,
         install_policy: InstallPolicy,
+        channel_overrides: HashMap<String, crate::source::InstallSource>,
         dry_run: bool,
     }
 
@@ -368,6 +398,7 @@ mod tests {
                 consent_log: Vec::new(),
                 consent_answer: true,
                 install_policy: InstallPolicy::Prompt,
+                channel_overrides: HashMap::new(),
                 dry_run: false,
             }
         }
@@ -388,6 +419,7 @@ mod tests {
                 exec: &mut self.exec,
                 consent: &mut consent,
                 install_policy: self.install_policy,
+                channel_overrides: &self.channel_overrides,
                 dry_run: self.dry_run,
             };
             engine.sync_tool(tool)
@@ -467,6 +499,106 @@ mod tests {
         assert_eq!(report.after.as_deref(), Some("1.1"));
         assert_eq!(report.commands, vec!["footool update"]);
         assert!(fx.exec.saw("footool update"));
+    }
+
+    #[test]
+    fn channel_override_replaces_detected_update_source() {
+        let mut fx = Fixture::new();
+        fx.channel_overrides
+            .insert("footool".to_string(), crate::source::InstallSource::Npm);
+        fx.probe.script_capture("footool --version", true, "1.0");
+        fx.probe.script_capture("footool --version", true, "1.1");
+        let report = fx.sync(
+            &multi_channel_footool(),
+            Some("/opt/homebrew/Cellar/footool/1.0/bin/footool"),
+        );
+
+        assert_eq!(report.outcome, Outcome::Ok);
+        assert_eq!(report.commands, vec!["npm install -g footool@latest"]);
+        assert!(fx.exec.saw("npm install -g footool@latest"));
+        assert!(!fx.exec.saw("brew upgrade footool"));
+    }
+
+    #[test]
+    fn absent_channel_override_keeps_detected_source_behavior() {
+        let mut fx = Fixture::new();
+        fx.probe.script_capture("footool --version", true, "1.0");
+        fx.probe.script_capture("footool --version", true, "1.1");
+        let report = fx.sync(
+            &multi_channel_footool(),
+            Some("/opt/homebrew/Cellar/footool/1.0/bin/footool"),
+        );
+
+        assert_eq!(report.outcome, Outcome::Ok);
+        assert_eq!(report.commands, vec!["brew upgrade footool"]);
+        assert!(fx.exec.saw("brew upgrade footool"));
+    }
+
+    #[test]
+    fn unsupported_channel_override_skips_with_configured_channel_reason() {
+        let mut fx = Fixture::new();
+        fx.channel_overrides
+            .insert("footool".to_string(), crate::source::InstallSource::Npm);
+        fx.probe.script_capture("footool --version", true, "1.0");
+        let report = fx.sync(&footool(), Some("/usr/local/bin/footool"));
+
+        assert_eq!(report.outcome, Outcome::Skip);
+        let reason = report.reason.expect("explains configured override");
+        assert!(
+            reason.contains("configured channel `npm`"),
+            "reason: {reason}"
+        );
+        assert!(
+            reason.contains("footool is native-only"),
+            "reason: {reason}"
+        );
+        assert!(fx.exec.calls.is_empty());
+    }
+
+    #[test]
+    fn channel_override_does_not_apply_to_missing_tool_installs() {
+        let mut fx = Fixture::new();
+        fx.install_policy = InstallPolicy::Always;
+        fx.channel_overrides
+            .insert("footool".to_string(), crate::source::InstallSource::Npm);
+        fx.probe.script_capture("footool --version", true, "1.0");
+        let report = fx.sync(&multi_channel_footool(), None);
+
+        assert_eq!(report.action, ActionKind::Install);
+        assert_eq!(report.outcome, Outcome::Ok);
+        assert_eq!(report.commands, vec!["sh -c foo-install.sh".to_string()]);
+    }
+
+    #[test]
+    fn dry_run_records_overridden_update_command() {
+        let mut fx = Fixture::new();
+        fx.dry_run = true;
+        fx.channel_overrides
+            .insert("footool".to_string(), crate::source::InstallSource::Npm);
+        fx.probe.script_capture("footool --version", true, "1.0");
+        let report = fx.sync(
+            &multi_channel_footool(),
+            Some("/opt/homebrew/Cellar/footool/1.0/bin/footool"),
+        );
+
+        assert_eq!(report.outcome, Outcome::Ok);
+        assert_eq!(report.after, None);
+        assert_eq!(report.commands, vec!["npm install -g footool@latest"]);
+        assert!(fx.exec.saw("npm install -g footool@latest"));
+    }
+
+    #[test]
+    fn npm_override_from_non_npm_install_falls_back_to_bare_npm() {
+        let mut fx = Fixture::new();
+        fx.channel_overrides
+            .insert("footool".to_string(), crate::source::InstallSource::Npm);
+        fx.probe.script_capture("footool --version", true, "1.0");
+        fx.probe.script_capture("footool --version", true, "1.1");
+        let report = fx.sync(&multi_channel_footool(), Some("/usr/local/bin/footool"));
+
+        assert_eq!(report.outcome, Outcome::Ok);
+        assert_eq!(report.commands, vec!["npm install -g footool@latest"]);
+        assert!(fx.exec.saw("npm install -g footool@latest"));
     }
 
     #[test]
@@ -675,6 +807,7 @@ mod tests {
         let find_bin = move |_: &str| Some(found.clone());
         let mut consent = |_: &str| true;
         let os = macos();
+        let channel_overrides = HashMap::new();
         let mut engine = Engine {
             os: &os,
             find_bin: &find_bin,
@@ -682,6 +815,7 @@ mod tests {
             exec: &mut exec,
             consent: &mut consent,
             install_policy: InstallPolicy::Prompt,
+            channel_overrides: &channel_overrides,
             dry_run: false,
         };
 

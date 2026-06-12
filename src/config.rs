@@ -7,14 +7,16 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
+use crate::source::InstallSource;
+use crate::tools::ToolSpec;
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize)]
 pub struct Config {
     /// Tools to manage (default: every known tool).
     pub tools: Option<Vec<String>>,
     /// How to treat missing tools: prompt | always | never.
     pub install_missing: Option<InstallMissing>,
-    /// Per-tool preferred channel overrides (parsed; applying them to the
-    /// engine is tracked as tech debt TD-004).
+    /// Per-tool preferred channel overrides for update planning.
     pub channels: Option<HashMap<String, String>>,
 }
 
@@ -61,6 +63,34 @@ pub fn load() -> Result<Config, String> {
     }
 }
 
+pub fn channel_overrides(
+    channels: Option<&HashMap<String, String>>,
+    registry: &[ToolSpec],
+) -> Result<HashMap<String, InstallSource>, String> {
+    let Some(channels) = channels else {
+        return Ok(HashMap::new());
+    };
+    let known: Vec<&str> = registry.iter().map(|t| t.id).collect();
+    let known_channels = ["native", "brew", "npm", "winget", "scoop"];
+    let mut mapped = HashMap::new();
+    for (tool_id, channel) in channels {
+        if !known.contains(&tool_id.as_str()) {
+            return Err(format!(
+                "unknown channel override tool id `{tool_id}` (known ids: {})",
+                known.join(", ")
+            ));
+        }
+        let Some(source) = InstallSource::from_channel_name(channel) else {
+            return Err(format!(
+                "unknown channel `{channel}` for `{tool_id}` (known channels: {})",
+                known_channels.join(", ")
+            ));
+        };
+        mapped.insert(tool_id.clone(), source);
+    }
+    Ok(mapped)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,6 +126,37 @@ codex = "npm"
     #[test]
     fn invalid_install_missing_value_is_an_error() {
         assert!(parse(r#"install_missing = "sometimes""#).is_err());
+    }
+
+    #[test]
+    fn validates_channel_overrides() {
+        let mut raw = HashMap::new();
+        raw.insert("gemini".to_string(), "npm".to_string());
+        raw.insert("codex".to_string(), "brew".to_string());
+
+        let overrides = channel_overrides(Some(&raw), &crate::tools::registry()).unwrap();
+        assert_eq!(overrides.get("gemini"), Some(&InstallSource::Npm));
+        assert_eq!(overrides.get("codex"), Some(&InstallSource::Brew));
+    }
+
+    #[test]
+    fn unknown_channel_override_tool_id_is_an_error() {
+        let mut raw = HashMap::new();
+        raw.insert("no-such-tool".to_string(), "npm".to_string());
+
+        let err = channel_overrides(Some(&raw), &crate::tools::registry()).unwrap_err();
+        assert!(err.contains("no-such-tool"), "err was: {err}");
+        assert!(err.contains("known ids"), "err was: {err}");
+    }
+
+    #[test]
+    fn unknown_channel_name_is_an_error() {
+        let mut raw = HashMap::new();
+        raw.insert("gemini".to_string(), "npn".to_string());
+
+        let err = channel_overrides(Some(&raw), &crate::tools::registry()).unwrap_err();
+        assert!(err.contains("npn"), "err was: {err}");
+        assert!(err.contains("known channels"), "err was: {err}");
     }
 
     #[test]

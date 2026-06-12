@@ -17,6 +17,29 @@ pub enum InstallSource {
     Scoop,
 }
 
+impl InstallSource {
+    pub fn from_channel_name(name: &str) -> Option<InstallSource> {
+        match name {
+            "native" => Some(InstallSource::Native),
+            "brew" => Some(InstallSource::Brew),
+            "npm" => Some(InstallSource::Npm),
+            "winget" => Some(InstallSource::Winget),
+            "scoop" => Some(InstallSource::Scoop),
+            _ => None,
+        }
+    }
+
+    pub fn channel_name(self) -> &'static str {
+        match self {
+            InstallSource::Native => "native",
+            InstallSource::Brew => "brew",
+            InstallSource::Npm => "npm",
+            InstallSource::Winget => "winget",
+            InstallSource::Scoop => "scoop",
+        }
+    }
+}
+
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 

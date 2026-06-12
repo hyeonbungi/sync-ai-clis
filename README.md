@@ -40,7 +40,7 @@
 
 `sync-ai-clis` is a cross-platform (macOS · Windows · Linux) Rust CLI that reconciles your machine toward one state: every known AI CLI installed, working, and current. Installed tools get updated. Missing tools are installed after you consent. Then every tool is re-verified by actually running `--version`, which catches broken installs that `command -v` would miss.
 
-**Current status: released.** `list`, `doctor`, `--dry-run`, and consent-based install/update all work, verified by 107 tests plus real-channel runs on Linux containers, macOS, and Windows CI. [SPEC.md](./SPEC.md) holds the full design — confirmed decisions, architecture, the per-tool install/update matrix, and the test and release strategy. It is the single source of truth for this repository.
+**Current status: released.** `list`, `doctor`, `--dry-run`, and consent-based install/update all work, verified by 116 tests plus real-channel runs on Linux containers, macOS, and Windows CI. [SPEC.md](./SPEC.md) holds the full design — confirmed decisions, architecture, the per-tool install/update matrix, and the test and release strategy. It is the single source of truth for this repository.
 
 ## At A Glance
 
@@ -50,9 +50,9 @@
 | Managed tools (v1) | `claude`, `codex`, `gemini`, `kiro-cli`, `agy` |
 | Platforms | macOS · Windows · Linux |
 | Stack | Rust (single binary) |
-| Status | Released — engine verified on all three OSes (107 offline tests + real-channel CI) |
+| Status | Released — engine verified on all three OSes (116 offline tests + real-channel CI) |
 | Distribution | GitHub Releases · Homebrew tap · npm · crates.io · winget · Scoop · ghcr (Docker) |
-| Tests | 107 offline tests + Docker distro matrix + 3-OS CI with real-channel runs |
+| Tests | 116 offline tests + Docker distro matrix + 3-OS CI with real-channel runs |
 | License | [MIT](./LICENSE) |
 | Author | [hyeonbungi](https://github.com/hyeonbungi) |
 
@@ -133,7 +133,7 @@ This tool runs remote official installers (`curl | bash`, `irm | iex`) and packa
 ## Development
 
 ```bash
-cargo test                 # 107 offline tests — no network, no system changes
+cargo test                 # 116 offline tests — no network, no system changes
 cargo fmt --check && cargo clippy --all-targets -- -D warnings
 cargo run -- list          # read-only: detect tools and show versions
 cargo run -- --dry-run     # show exactly what a sync would run, execute nothing
@@ -146,7 +146,7 @@ For the reasoning behind it — decisions, architecture, the per-tool command ma
 
 - **Kiro on Windows**: needs Windows 11, and upstream has not confirmed the exact official install command yet, so sync-ai-clis reports a clear SKIP rather than guess a URL. An already-installed `kiro-cli` still self-updates fine. Tracked in [SPEC.md](./SPEC.md) §11.
 - **Alpine/musl**: the sync-ai-clis binary runs on musl, but most upstream installers do not ship musl builds yet.
-- **Config `[channels]` overrides** are parsed, but channel selection does not apply them yet.
+- **Config `[channels]` overrides** apply to update planning only. Missing-tool installs and `doctor` diagnostics still use the real detected state.
 
 ## Maintenance Signals
 

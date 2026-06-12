@@ -214,6 +214,7 @@ codex  = "npm"
 ```
 - Windows config 경로는 `%APPDATA%\sync-ai-clis\config.toml` (또는 `dirs` 크레이트의 config_dir).
 - 플래그가 config보다 우선.
+- `[channels]`는 설치된 도구의 **업데이트 계획**에만 적용한다. 미설치 도구의 설치 경로와 `doctor`의 현실 진단에는 적용하지 않는다. 알 수 없는 도구 id나 채널명은 config 오류(exit 2)로 처리한다.
 
 ### 6.3 출력 / exit code
 - 사람용: 도구별 `현재→결과` + 색상 OK/FAIL/SKIP + 마지막 요약 표 (원본 스타일 계승)
