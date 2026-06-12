@@ -102,6 +102,27 @@ fn doctor_json_emits_diagnosis_schema_read_only() {
 }
 
 #[test]
+fn doctor_global_only_json_filters_to_one_tool_read_only() {
+    // Read-only: doctor only probes --version, never installs or updates.
+    let out = bin()
+        .args(["doctor", "--only", "gemini", "--json"])
+        .output()
+        .unwrap();
+    assert!(
+        matches!(out.status.code(), Some(0) | Some(1)),
+        "doctor exits 0 (clean) or 1 (issues found), got {:?}; stderr: {}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let value: serde_json::Value =
+        serde_json::from_str(stdout.trim()).unwrap_or_else(|e| panic!("bad json ({e}): {stdout}"));
+    let rows = value.as_array().unwrap();
+    assert_eq!(rows.len(), 1, "only gemini should be diagnosed: {stdout}");
+    assert_eq!(rows[0]["id"], "gemini");
+}
+
+#[test]
 fn list_shows_all_known_tools_read_only() {
     let out = bin().arg("list").output().unwrap();
     assert!(out.status.success());

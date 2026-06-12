@@ -40,7 +40,7 @@
 
 `sync-ai-clis` is a cross-platform (macOS · Windows · Linux) Rust CLI that reconciles your machine toward one state: every known AI CLI installed, working, and current. Installed tools get updated. Missing tools are installed after you consent. Then every tool is re-verified by actually running `--version`, which catches broken installs that `command -v` would miss.
 
-**Current status: released.** `list`, `--dry-run`, and consent-based install/update all work, verified by 87 tests plus real-channel runs on Linux containers, macOS, and Windows CI. [SPEC.md](./SPEC.md) holds the full design — confirmed decisions, architecture, the per-tool install/update matrix, and the test and release strategy. It is the single source of truth for this repository.
+**Current status: released.** `list`, `doctor`, `--dry-run`, and consent-based install/update all work, verified by 107 tests plus real-channel runs on Linux containers, macOS, and Windows CI. [SPEC.md](./SPEC.md) holds the full design — confirmed decisions, architecture, the per-tool install/update matrix, and the test and release strategy. It is the single source of truth for this repository.
 
 ## At A Glance
 
@@ -50,9 +50,9 @@
 | Managed tools (v1) | `claude`, `codex`, `gemini`, `kiro-cli`, `agy` |
 | Platforms | macOS · Windows · Linux |
 | Stack | Rust (single binary) |
-| Status | Released — engine verified on all three OSes (87 offline tests + real-channel CI) |
+| Status | Released — engine verified on all three OSes (107 offline tests + real-channel CI) |
 | Distribution | GitHub Releases · Homebrew tap · npm · crates.io · winget · Scoop · ghcr (Docker) |
-| Tests | 87 offline tests + Docker distro matrix + 3-OS CI with real-channel runs |
+| Tests | 107 offline tests + Docker distro matrix + 3-OS CI with real-channel runs |
 | License | [MIT](./LICENSE) |
 | Author | [hyeonbungi](https://github.com/hyeonbungi) |
 
@@ -102,8 +102,11 @@ sync-ai-clis --only claude,gemini
 sync-ai-clis --except kiro
 sync-ai-clis --dry-run       # print the exact commands, execute nothing
 sync-ai-clis list            # known tools + installed/current version table (alias: status)
+sync-ai-clis doctor          # read-only diagnosis: broken, duplicate, or shadowed installs
 sync-ai-clis --json          # machine-readable summary
 ```
+
+`--only`, `--except`, and `--json` are global flags, so they also work after subcommands, for example `sync-ai-clis doctor --only gemini --json`.
 
 Exit codes: `0` all OK · `1` any failure · `2` usage error. Configuration lives in `~/.config/sync-ai-clis/config.toml`, and flags win over config.
 
@@ -130,7 +133,7 @@ This tool runs remote official installers (`curl | bash`, `irm | iex`) and packa
 ## Development
 
 ```bash
-cargo test                 # 87 offline tests — no network, no system changes
+cargo test                 # 107 offline tests — no network, no system changes
 cargo fmt --check && cargo clippy --all-targets -- -D warnings
 cargo run -- list          # read-only: detect tools and show versions
 cargo run -- --dry-run     # show exactly what a sync would run, execute nothing

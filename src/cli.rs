@@ -27,11 +27,11 @@ pub struct Cli {
     pub no_install: bool,
 
     /// Only manage these tools (comma-separated ids, e.g. claude,gemini)
-    #[arg(long, value_delimiter = ',', value_name = "IDS")]
+    #[arg(long, global = true, value_delimiter = ',', value_name = "IDS")]
     pub only: Vec<String>,
 
     /// Manage all tools except these (comma-separated ids)
-    #[arg(long, value_delimiter = ',', value_name = "IDS")]
+    #[arg(long, global = true, value_delimiter = ',', value_name = "IDS")]
     pub except: Vec<String>,
 
     /// Print the exact commands that would run, execute nothing
@@ -142,6 +142,14 @@ mod tests {
     #[test]
     fn doctor_subcommand_parses() {
         assert_eq!(parse(&["doctor"]).command, Some(Subcmd::Doctor));
+    }
+
+    #[test]
+    fn tool_filters_parse_after_doctor_subcommand() {
+        let cli = parse(&["doctor", "--only", "gemini", "--except", "claude"]);
+        assert_eq!(cli.command, Some(Subcmd::Doctor));
+        assert_eq!(cli.only, vec!["gemini"]);
+        assert_eq!(cli.except, vec!["claude"]);
     }
 
     #[test]
