@@ -33,6 +33,25 @@ impl<T> Support<T> {
     }
 }
 
+/// How `check` learns a tool's latest available version (read-only, design
+/// doc 0012). `Probe` runs a command and extracts the version from its
+/// stdout; `SelfUpdating` marks tools that update themselves in the
+/// background, so a "behind" check is not meaningful.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LatestSource {
+    Probe { command: Command, extract: Extract },
+    SelfUpdating,
+}
+
+/// How to pull a version string out of a probe's stdout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Extract {
+    /// stdout is the version itself (`npm view <pkg> version`).
+    Raw,
+    /// stdout is JSON; take this top-level string key (agy manifest).
+    JsonKey(&'static str),
+}
+
 /// One managed AI CLI, described as data plus per-OS/per-source plan
 /// functions (SPEC §5.2 — function pointers keep OS/source branching
 /// expressible while tool addition stays declarative).
@@ -53,6 +72,8 @@ pub struct ToolSpec {
     /// Recovery when the binary exists but does not work (Codex reinstall,
     /// inherited from the original script).
     pub on_broken: Option<fn(&OsInfo, InstallSource) -> Vec<Command>>,
+    /// How `check` learns the latest available version (design doc 0012).
+    pub latest_source: fn(&OsInfo) -> LatestSource,
 }
 
 mod antigravity;

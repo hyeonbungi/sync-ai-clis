@@ -40,7 +40,7 @@
 
 `sync-ai-clis`는 머신을 "알려진 AI CLI가 전부 설치되어 있고, 동작하고, 최신인 상태"로 맞추는(reconcile) 크로스플랫폼(macOS · Windows · Linux) Rust CLI입니다. 설치된 도구는 업데이트하고, 미설치 도구는 동의를 받아 설치하며, 작업이 끝나면 각 도구를 재검증합니다(`command -v`가 아니라 `--version`이 실제로 도는지 확인해 깨진 설치를 잡아냅니다).
 
-**현재 상태: 릴리스됨.** `list`·`doctor`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 테스트 120개와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
+**현재 상태: 릴리스됨.** `list`·`doctor`·`check`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 테스트 132개와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
 
 ## At A Glance
 
@@ -103,12 +103,13 @@ sync-ai-clis --except kiro
 sync-ai-clis --dry-run       # 실행할 명령만 출력, 아무것도 실행 안 함
 sync-ai-clis list            # 알려진 도구 + 설치/현재 버전 표 (별칭: status)
 sync-ai-clis doctor          # 읽기 전용 진단: 깨진 설치, 중복 설치, PATH 미반영
+sync-ai-clis check           # 읽기 전용: 업데이트 가용성만 확인, 종료코드로 신호 (CI·cron·프롬프트 배지)
 sync-ai-clis --json          # 자동화용 JSON 요약
 ```
 
 `--only`, `--except`, `--json`은 전역 플래그라 `sync-ai-clis doctor --only gemini --json`처럼 서브커맨드 뒤에서도 사용할 수 있습니다.
 
-종료 코드: `0` 전부 정상 · `1` 하나라도 실패 · `2` 사용법 오류. 설정은 `~/.config/sync-ai-clis/config.toml`에 둡니다(플래그가 config보다 우선).
+종료 코드: `0` 전부 정상 · `1` 하나라도 실패 · `2` 사용법 오류 (`check`는 `10` = 업데이트 있음을 추가로 사용). 설정은 `~/.config/sync-ai-clis/config.toml`에 둡니다(플래그가 config보다 우선).
 
 ## 신뢰 모델
 

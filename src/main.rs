@@ -6,6 +6,7 @@ use std::io::Write;
 
 use clap::Parser;
 
+use sync_ai_clis::check;
 use sync_ai_clis::cli::{self, Cli, Subcmd};
 use sync_ai_clis::config;
 use sync_ai_clis::doctor;
@@ -54,6 +55,7 @@ fn run() -> i32 {
     match cli.command {
         Some(Subcmd::List) => return list(&tools),
         Some(Subcmd::Doctor) => return doctor_cmd(&tools, &os, cli.json),
+        Some(Subcmd::Check) => return check_cmd(&tools, &os, cli.json),
         None => {}
     }
 
@@ -138,6 +140,26 @@ fn doctor_cmd(tools: &[ToolSpec], os: &OsInfo, json: bool) -> i32 {
         );
     }
     if doctor::has_issues(&diagnoses) { 1 } else { 0 }
+}
+
+/// `check`: read-only "is an update available?" per tool (design doc 0012).
+/// Probes installed `--version` and each tool's declared latest source
+/// (`npm view` / official manifest); changes nothing. Exit 10 when any update
+/// is available, 1 when a verdict is inconclusive, 0 when all current.
+fn check_cmd(tools: &[ToolSpec], os: &OsInfo, json: bool) -> i32 {
+    let find_bin = |bin: &str| source::find_in_path(bin);
+    let mut probe = RealRunner::interactive();
+    let results: Vec<_> = tools
+        .iter()
+        .map(|tool| check::check_tool(tool, os, &find_bin, &mut probe))
+        .collect();
+
+    if json {
+        println!("{}", check::json_check(&results));
+    } else {
+        anstream::println!("{}", check::render(&results));
+    }
+    check::exit_code(&results)
 }
 
 /// `list` / `status`: read-only table of known tools (SPEC §6.1).

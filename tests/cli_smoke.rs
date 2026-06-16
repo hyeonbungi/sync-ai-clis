@@ -20,6 +20,7 @@ fn help_describes_the_real_cli() {
         "--dry-run",
         "--json",
         "list",
+        "check",
     ] {
         assert!(text.contains(expected), "help missing {expected}: {text}");
     }
@@ -136,4 +137,44 @@ fn list_shows_all_known_tools_read_only() {
     ] {
         assert!(text.contains(display), "list missing {display}: {text}");
     }
+}
+
+#[test]
+fn check_only_kiro_json_is_read_only_and_network_free() {
+    // Kiro is SelfUpdating, so `check` never runs a latest-version probe for
+    // it — this exercises check_cmd end-to-end (routing, --version probe, JSON,
+    // exit code) without any network call. self-updating/not-installed are
+    // both neutral, so the exit code is 0 either way (installed or not).
+    let out = bin()
+        .args(["check", "--only", "kiro", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "expected exit 0; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let value: serde_json::Value =
+        serde_json::from_str(stdout.trim()).unwrap_or_else(|e| panic!("bad json ({e}): {stdout}"));
+    let rows = value.as_array().unwrap();
+    assert_eq!(rows.len(), 1, "only kiro should be checked: {stdout}");
+    assert_eq!(rows[0]["id"], "kiro");
+    for key in [
+        "id",
+        "display",
+        "installed",
+        "current",
+        "latest",
+        "status",
+        "note",
+    ] {
+        assert!(rows[0].get(key).is_some(), "row missing {key}: {}", rows[0]);
+    }
+    let status = rows[0]["status"].as_str().unwrap();
+    assert!(
+        ["self-updating", "not-installed"].contains(&status),
+        "unexpected kiro status: {status}"
+    );
 }

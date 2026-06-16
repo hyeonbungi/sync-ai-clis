@@ -12,6 +12,7 @@ use crate::os::OsInfo;
 use crate::runner::{Command, CommandRunner};
 use crate::source::{self, InstallSource};
 use crate::tools::ToolSpec;
+use crate::version::version_key;
 
 /// One discovered copy of a tool's binary.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -184,23 +185,6 @@ fn duplicates_advice(locations: &[Location]) -> String {
     )
 }
 
-/// First `digits(.digits)+` token, parsed numerically — `"2.1.170 (Claude
-/// Code)"` → `[2, 1, 170]`. None when no such token exists.
-fn version_key(version: &str) -> Option<Vec<u64>> {
-    version
-        .split(|c: char| !(c.is_ascii_digit() || c == '.'))
-        .filter(|token| token.contains('.'))
-        .find_map(|token| {
-            let parts: Vec<u64> = token
-                .split('.')
-                .filter(|p| !p.is_empty())
-                .map(str::parse)
-                .collect::<Result<_, _>>()
-                .ok()?;
-            (parts.len() >= 2).then_some(parts)
-        })
-}
-
 /// True when any diagnosis needs attention (missing tools do not).
 pub fn has_issues(diagnoses: &[Diagnosis]) -> bool {
     diagnoses
@@ -326,6 +310,7 @@ mod tests {
                 _ => Unsupported("footool is native-only"),
             },
             on_broken: None,
+            latest_source: |_| crate::tools::LatestSource::SelfUpdating,
         }
     }
 
@@ -514,13 +499,6 @@ mod tests {
         assert!(has_issues(&[mk(Health::Duplicates)]));
         assert!(has_issues(&[mk(Health::Broken)]));
         assert!(has_issues(&[mk(Health::NotOnPath)]));
-    }
-
-    #[test]
-    fn version_keys_parse_real_tool_outputs_best_effort() {
-        assert_eq!(version_key("2.1.170 (Claude Code)"), Some(vec![2, 1, 170]));
-        assert_eq!(version_key("codex-cli 0.139.0"), Some(vec![0, 139, 0]));
-        assert_eq!(version_key("no digits here"), None);
     }
 
     #[test]

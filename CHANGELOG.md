@@ -2,6 +2,12 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.3.0 - 2026-06-16
+
+### Added
+
+- `check` subcommand: read-only update-availability per tool. It probes each installed tool's `--version` and its latest available version (the npm registry for Claude Code, Codex, and Gemini; the official release manifest for Antigravity), compares them, and reports `current` / `update-available` / `unknown` / `not-installed` / `self-updating` without changing anything. Exit code `10` when any update is available, `1` when a check is inconclusive, `0` when everything is current; `--json` is supported. Built for CI gates, cron checks, and shell-prompt badges. Kiro reports as self-updating because it updates itself in the background, and config `[channels]` overrides do not affect `check` (a tool's latest release is independent of how it was installed).
+
 ## 0.2.2 - 2026-06-12
 
 ### Fixed

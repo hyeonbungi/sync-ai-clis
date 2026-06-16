@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use crate::os::{Os, OsInfo};
 use crate::runner::Command;
 use crate::source::InstallSource;
-use crate::tools::{Support, ToolSpec};
+use crate::tools::{Extract, LatestSource, Support, ToolSpec};
 
 const INSTALL_SH_URL: &str = "https://claude.ai/install.sh";
 const INSTALL_PS1_URL: &str = "https://claude.ai/install.ps1";
@@ -22,6 +22,7 @@ pub fn spec() -> ToolSpec {
         install,
         update,
         on_broken: None,
+        latest_source,
     }
 }
 
@@ -56,5 +57,15 @@ fn update(_os: &OsInfo, source: InstallSource) -> Support<Vec<Command>> {
         InstallSource::Scoop => {
             Support::Unsupported("no confirmed Scoop package for Claude Code (SPEC §7.1)")
         }
+    }
+}
+
+fn latest_source(_os: &OsInfo) -> LatestSource {
+    // npm is the channel-independent version oracle (design doc 0012): the
+    // package tracks the same release train as the native installer, so
+    // `npm view` reports latest even when claude was installed natively.
+    LatestSource::Probe {
+        command: Command::new("npm", &["view", "@anthropic-ai/claude-code", "version"]),
+        extract: Extract::Raw,
     }
 }

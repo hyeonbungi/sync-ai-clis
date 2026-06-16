@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use crate::os::{Os, OsInfo};
 use crate::runner::Command;
 use crate::source::InstallSource;
-use crate::tools::{Support, ToolSpec};
+use crate::tools::{Extract, LatestSource, Support, ToolSpec};
 
 pub fn spec() -> ToolSpec {
     ToolSpec {
@@ -21,6 +21,7 @@ pub fn spec() -> ToolSpec {
         install,
         update,
         on_broken: None,
+        latest_source,
     }
 }
 
@@ -53,5 +54,12 @@ fn update(os: &OsInfo, source: InstallSource) -> Support<Vec<Command>> {
         InstallSource::Winget | InstallSource::Scoop => {
             Support::Unsupported("Gemini is not distributed via winget/Scoop (SPEC §7.3)")
         }
+    }
+}
+
+fn latest_source(_os: &OsInfo) -> LatestSource {
+    LatestSource::Probe {
+        command: Command::new("npm", &["view", "@google/gemini-cli", "version"]),
+        extract: Extract::Raw,
     }
 }

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use crate::os::{Os, OsInfo};
 use crate::runner::Command;
 use crate::source::InstallSource;
-use crate::tools::{Support, ToolSpec};
+use crate::tools::{LatestSource, Support, ToolSpec};
 
 const INSTALL_URL: &str = "https://cli.kiro.dev/install";
 const INSTALL_PS1_URL: &str = "https://cli.kiro.dev/install.ps1";
@@ -25,6 +25,7 @@ pub fn spec() -> ToolSpec {
         install,
         update,
         on_broken: None,
+        latest_source,
     }
 }
 
@@ -68,4 +69,10 @@ fn update(_os: &OsInfo, source: InstallSource) -> Support<Vec<Command>> {
         )]),
         _ => Support::Unsupported("Kiro has no package-manager channel (SPEC §7.4)"),
     }
+}
+
+fn latest_source(_os: &OsInfo) -> LatestSource {
+    // Kiro background-self-updates (auto-apply), so a "behind" check is not
+    // meaningful — report it as self-updating (design doc 0012).
+    LatestSource::SelfUpdating
 }

@@ -1,0 +1,33 @@
+<svg viewBox="0 0 640 300" width="640" height="300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="sync-ai-clis check reporting one available update and exit code 10">
+  <style>
+    .t { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; fill: #e6edf3; white-space: pre; }
+    .ti { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; fill: #8b949e; }
+    .d { fill: #8b949e; }
+    .g { fill: #3fb950; }
+    .y { fill: #d29922; }
+    .p { fill: #7ee787; }
+  </style>
+  <rect x="0.5" y="0.5" width="639" height="299" rx="10" fill="#0d1117"/>
+  <rect x="0.5" y="0.5" width="639" height="36" rx="10" fill="#161b22"/>
+  <rect x="0.5" y="20" width="639" height="16.5" fill="#161b22"/>
+  <line x1="0.5" y1="36.5" x2="639.5" y2="36.5" stroke="#30363d"/>
+  <circle cx="22" cy="18.5" r="6" fill="#ff5f57"/>
+  <circle cx="42" cy="18.5" r="6" fill="#febc2e"/>
+  <circle cx="62" cy="18.5" r="6" fill="#28c840"/>
+  <text x="320" y="23" text-anchor="middle" class="ti">sync-ai-clis</text>
+
+  <text x="22" y="66" class="t" xml:space="preserve"><tspan class="p">$</tspan> sync-ai-clis check</text>
+
+  <text x="22" y="96" class="t" xml:space="preserve">Claude Code      <tspan class="d">2.1.170 (Claude Code) -&gt; 2.1.178</tspan>   <tspan class="y">update available</tspan></text>
+  <text x="22" y="116" class="t" xml:space="preserve">Codex CLI        <tspan class="d">codex-cli 0.140.0</tspan>   <tspan class="g">up to date</tspan></text>
+  <text x="22" y="136" class="t" xml:space="preserve">Gemini CLI       <tspan class="d">0.46.0</tspan>   <tspan class="g">up to date</tspan></text>
+  <text x="22" y="156" class="t" xml:space="preserve">Kiro CLI         <tspan class="d">kiro-cli 2.7.0</tspan>   <tspan class="d">self-updating (auto)</tspan></text>
+  <text x="22" y="176" class="t" xml:space="preserve">Antigravity CLI  <tspan class="d">1.0.8</tspan>   <tspan class="g">up to date</tspan></text>
+
+  <text x="22" y="206" class="t" xml:space="preserve"><tspan class="y">1 update available.</tspan></text>
+
+  <text x="22" y="236" class="t" xml:space="preserve"><tspan class="p">$</tspan> echo $?</text>
+  <text x="22" y="256" class="t" xml:space="preserve"><tspan class="y">10</tspan></text>
+
+  <rect x="0.5" y="0.5" width="639" height="299" rx="10" fill="none" stroke="#30363d"/>
+</svg>

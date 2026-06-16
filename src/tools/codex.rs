@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use crate::os::{Os, OsInfo};
 use crate::runner::Command;
 use crate::source::InstallSource;
-use crate::tools::{Support, ToolSpec};
+use crate::tools::{Extract, LatestSource, Support, ToolSpec};
 
 const INSTALL_SH_URL: &str = "https://chatgpt.com/codex/install.sh";
 const INSTALL_PS1_URL: &str = "https://chatgpt.com/codex/install.ps1";
@@ -24,6 +24,7 @@ pub fn spec() -> ToolSpec {
         install,
         update,
         on_broken: Some(on_broken),
+        latest_source,
     }
 }
 
@@ -83,5 +84,12 @@ fn on_broken(os: &OsInfo, source: InstallSource) -> Vec<Command> {
             vec![Command::new("brew", &["reinstall", "--cask", "codex"])]
         }
         _ => install(os).supported().unwrap_or_default(),
+    }
+}
+
+fn latest_source(_os: &OsInfo) -> LatestSource {
+    LatestSource::Probe {
+        command: Command::new("npm", &["view", "@openai/codex", "version"]),
+        extract: Extract::Raw,
     }
 }

@@ -5,13 +5,16 @@
 
 use std::path::PathBuf;
 
-use crate::os::{Os, OsInfo};
+use crate::os::{Libc, Os, OsInfo};
 use crate::runner::Command;
 use crate::source::InstallSource;
-use crate::tools::{Support, ToolSpec};
+use crate::tools::{Extract, LatestSource, Support, ToolSpec};
 
 const INSTALL_SH_URL: &str = "https://antigravity.google/cli/install.sh";
 const INSTALL_PS1_URL: &str = "https://antigravity.google/cli/install.ps1";
+/// Official auto-updater host the installer itself queries (design doc 0012);
+/// the per-platform manifest's `version` key is the read-only latest source.
+const MANIFEST_BASE: &str = "https://antigravity-cli-auto-updater-974169037036.us-central1.run.app";
 
 pub fn spec() -> ToolSpec {
     ToolSpec {
@@ -24,6 +27,7 @@ pub fn spec() -> ToolSpec {
         install,
         update,
         on_broken: None,
+        latest_source,
     }
 }
 
@@ -47,5 +51,27 @@ fn update(_os: &OsInfo, source: InstallSource) -> Support<Vec<Command>> {
     match source {
         InstallSource::Native => Support::Supported(vec![Command::new("agy", &["update"])]),
         _ => Support::Unsupported("Antigravity has no package-manager channel (SPEC §7.5)"),
+    }
+}
+
+fn latest_source(os: &OsInfo) -> LatestSource {
+    // Read the same official per-platform manifest the installer uses; its
+    // `version` key is the latest available release (design doc 0012). A
+    // wrong/unknown platform 404s and degrades to `unknown` at runtime.
+    let arch = match os.arch.as_str() {
+        "x86_64" | "amd64" => "amd64",
+        "aarch64" | "arm64" => "arm64",
+        other => other,
+    };
+    let platform = match os.os {
+        Os::MacOs => format!("darwin_{arch}"),
+        Os::Linux if matches!(os.libc, Some(Libc::Musl)) => format!("linux_{arch}_musl"),
+        Os::Linux => format!("linux_{arch}"),
+        Os::Windows => format!("windows_{arch}"),
+    };
+    let url = format!("{MANIFEST_BASE}/manifests/{platform}.json");
+    LatestSource::Probe {
+        command: Command::new("curl", &["-fsSL", &url]),
+        extract: Extract::JsonKey("version"),
     }
 }

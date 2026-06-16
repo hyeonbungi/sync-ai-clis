@@ -1,3 +1,4 @@
+pub mod check;
 pub mod cli;
 pub mod config;
 pub mod doctor;
@@ -7,3 +8,4 @@ pub mod report;
 pub mod runner;
 pub mod source;
 pub mod tools;
+pub mod version;

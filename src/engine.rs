@@ -367,6 +367,7 @@ mod tests {
                 _ => Unsupported("footool is native-only"),
             },
             on_broken: None,
+            latest_source: |_| crate::tools::LatestSource::SelfUpdating,
         }
     }
 

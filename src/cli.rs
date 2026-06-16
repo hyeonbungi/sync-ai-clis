@@ -53,6 +53,8 @@ pub enum Subcmd {
     List,
     /// Diagnose broken, duplicate, or shadowed installs (read-only)
     Doctor,
+    /// Check for available updates without changing anything (read-only)
+    Check,
 }
 
 /// Flags win over config; config pins the non-interactive default
@@ -142,6 +144,11 @@ mod tests {
     #[test]
     fn doctor_subcommand_parses() {
         assert_eq!(parse(&["doctor"]).command, Some(Subcmd::Doctor));
+    }
+
+    #[test]
+    fn check_subcommand_parses() {
+        assert_eq!(parse(&["check"]).command, Some(Subcmd::Check));
     }
 
     #[test]
