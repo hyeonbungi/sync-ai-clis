@@ -104,12 +104,13 @@ sync-ai-clis --dry-run       # print the exact commands, execute nothing
 sync-ai-clis list            # known tools + installed/current version table (alias: status)
 sync-ai-clis doctor          # read-only diagnosis: broken, duplicate, or shadowed installs
 sync-ai-clis check           # read-only: is an update available? signals via exit code (CI/cron/prompt badge)
+sync-ai-clis audit           # read-only: did a remote install script change? unified diff, --accept to re-baseline
 sync-ai-clis --json          # machine-readable summary
 ```
 
 `--only`, `--except`, and `--json` are global flags, so they also work after subcommands, for example `sync-ai-clis doctor --only gemini --json`.
 
-Exit codes: `0` all OK · `1` any failure · `2` usage error (`check` adds `10` = an update is available). Configuration lives in `~/.config/sync-ai-clis/config.toml`, and flags win over config.
+Exit codes: `0` all OK · `1` any failure · `2` usage error (`check` and `audit` add `10` = an update is available / a script changed). Configuration lives in `~/.config/sync-ai-clis/config.toml`, and flags win over config.
 
 ## Trust Model
 

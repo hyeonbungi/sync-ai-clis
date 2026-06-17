@@ -1,3 +1,5 @@
+pub mod audit;
+pub mod baseline;
 pub mod check;
 pub mod cli;
 pub mod config;

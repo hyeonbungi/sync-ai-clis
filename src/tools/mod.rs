@@ -74,6 +74,10 @@ pub struct ToolSpec {
     pub on_broken: Option<fn(&OsInfo, InstallSource) -> Vec<Command>>,
     /// How `check` learns the latest available version (design doc 0012).
     pub latest_source: fn(&OsInfo) -> LatestSource,
+    /// Current-OS install script URL for `audit` change detection (design
+    /// doc 0013). Always a §5.5 hardcoded official HTTPS const; None when the
+    /// tool has no remote install script (gemini installs via npm).
+    pub install_script: fn(&OsInfo) -> Option<&'static str>,
 }
 
 mod antigravity;

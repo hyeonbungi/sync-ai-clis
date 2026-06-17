@@ -247,6 +247,7 @@ mod tests {
                 command: Command::new("npm", &["view", "footool", "version"]),
                 extract: Extract::Raw,
             },
+            install_script: |_| None,
         }
     }
 

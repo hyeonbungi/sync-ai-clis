@@ -6,6 +6,8 @@ use std::io::Write;
 
 use clap::Parser;
 
+use sync_ai_clis::audit;
+use sync_ai_clis::baseline::BaselineStore;
 use sync_ai_clis::check;
 use sync_ai_clis::cli::{self, Cli, Subcmd};
 use sync_ai_clis::config;
@@ -56,6 +58,7 @@ fn run() -> i32 {
         Some(Subcmd::List) => return list(&tools),
         Some(Subcmd::Doctor) => return doctor_cmd(&tools, &os, cli.json),
         Some(Subcmd::Check) => return check_cmd(&tools, &os, cli.json),
+        Some(Subcmd::Audit { accept }) => return audit_cmd(&tools, &os, cli.json, accept),
         None => {}
     }
 
@@ -160,6 +163,37 @@ fn check_cmd(tools: &[ToolSpec], os: &OsInfo, json: bool) -> i32 {
         anstream::println!("{}", check::render(&results));
     }
     check::exit_code(&results)
+}
+
+/// `audit`: read-only detection of changes in remote install scripts (design
+/// doc 0013). Fetches each tool's install script and compares it to the
+/// accepted baseline; `--accept` records the current scripts as the new
+/// baseline (the only write). Exit 10 when any changed, 1 when a fetch failed,
+/// 0 otherwise.
+fn audit_cmd(tools: &[ToolSpec], os: &OsInfo, json: bool, accept: bool) -> i32 {
+    let Some(dir) = BaselineStore::default_dir() else {
+        eprintln!("error: no data directory for script baselines on this platform");
+        return 1;
+    };
+    let store = BaselineStore::new(dir);
+    let mut fetch = RealRunner::interactive();
+    let results: Vec<_> = tools
+        .iter()
+        .map(|tool| {
+            if accept {
+                audit::accept_tool(tool, os, &mut fetch, &store)
+            } else {
+                audit::audit_tool(tool, os, &mut fetch, &store)
+            }
+        })
+        .collect();
+
+    if json {
+        println!("{}", audit::json_audit(&results));
+    } else {
+        anstream::println!("{}", audit::render(&results));
+    }
+    audit::exit_code(&results)
 }
 
 /// `list` / `status`: read-only table of known tools (SPEC §6.1).

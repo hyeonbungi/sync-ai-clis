@@ -2,6 +2,12 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.4.0 - 2026-06-17
+
+### Added
+
+- `audit` subcommand: read-only detection of changes in remote install scripts. It fetches each tool's install script (`curl|bash` / `irm|iex` for Claude Code, Codex, Kiro, and Antigravity; Gemini installs through npm, so it is not applicable), compares it against the last accepted baseline kept under your data directory, and reports `unchanged` / `changed` (with a unified diff) / `unregistered` / `unavailable` / `not-applicable` — without changing anything. Plain `audit` never writes to disk; `audit --accept` records the current scripts as the new trusted baseline (the only write path). Exit code `10` when any script changed, `1` when a fetch was inconclusive, `0` otherwise; `--json` is supported. It is the fourth pillar of the trust model (SPEC §5.5): a practical defense against a `curl | bash` install script changing out from under you between runs.
+
 ## 0.3.0 - 2026-06-16
 
 ### Added

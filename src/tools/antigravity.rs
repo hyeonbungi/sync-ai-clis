@@ -28,6 +28,7 @@ pub fn spec() -> ToolSpec {
         update,
         on_broken: None,
         latest_source,
+        install_script,
     }
 }
 
@@ -74,4 +75,11 @@ fn latest_source(os: &OsInfo) -> LatestSource {
         command: Command::new("curl", &["-fsSL", &url]),
         extract: Extract::JsonKey("version"),
     }
+}
+
+fn install_script(os: &OsInfo) -> Option<&'static str> {
+    Some(match os.os {
+        Os::MacOs | Os::Linux => INSTALL_SH_URL,
+        Os::Windows => INSTALL_PS1_URL,
+    })
 }

@@ -55,6 +55,12 @@ pub enum Subcmd {
     Doctor,
     /// Check for available updates without changing anything (read-only)
     Check,
+    /// Detect changes in remote install scripts (read-only)
+    Audit {
+        /// Accept the current scripts as the new trusted baseline (the only write)
+        #[arg(long)]
+        accept: bool,
+    },
 }
 
 /// Flags win over config; config pins the non-interactive default
@@ -149,6 +155,29 @@ mod tests {
     #[test]
     fn check_subcommand_parses() {
         assert_eq!(parse(&["check"]).command, Some(Subcmd::Check));
+    }
+
+    #[test]
+    fn audit_subcommand_parses() {
+        assert_eq!(
+            parse(&["audit"]).command,
+            Some(Subcmd::Audit { accept: false })
+        );
+    }
+
+    #[test]
+    fn audit_accept_flag_parses() {
+        assert_eq!(
+            parse(&["audit", "--accept"]).command,
+            Some(Subcmd::Audit { accept: true })
+        );
+    }
+
+    #[test]
+    fn tool_filters_parse_after_audit_subcommand() {
+        let cli = parse(&["audit", "--only", "claude"]);
+        assert_eq!(cli.command, Some(Subcmd::Audit { accept: false }));
+        assert_eq!(cli.only, vec!["claude"]);
     }
 
     #[test]

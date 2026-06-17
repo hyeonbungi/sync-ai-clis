@@ -22,6 +22,7 @@ pub fn spec() -> ToolSpec {
         update,
         on_broken: None,
         latest_source,
+        install_script,
     }
 }
 
@@ -62,4 +63,8 @@ fn latest_source(_os: &OsInfo) -> LatestSource {
         command: Command::new("npm", &["view", "@google/gemini-cli", "version"]),
         extract: Extract::Raw,
     }
+}
+
+fn install_script(_os: &OsInfo) -> Option<&'static str> {
+    None // npm-managed; no remote install script to audit
 }

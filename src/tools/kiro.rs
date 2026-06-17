@@ -26,6 +26,7 @@ pub fn spec() -> ToolSpec {
         update,
         on_broken: None,
         latest_source,
+        install_script,
     }
 }
 
@@ -75,4 +76,12 @@ fn latest_source(_os: &OsInfo) -> LatestSource {
     // Kiro background-self-updates (auto-apply), so a "behind" check is not
     // meaningful — report it as self-updating (design doc 0012).
     LatestSource::SelfUpdating
+}
+
+fn install_script(os: &OsInfo) -> Option<&'static str> {
+    match os.os {
+        Os::MacOs | Os::Linux => Some(INSTALL_URL),
+        Os::Windows if os.is_windows_11() => Some(INSTALL_PS1_URL),
+        Os::Windows => None, // Win10 unsupported (no install), nothing to audit
+    }
 }

@@ -311,6 +311,7 @@ mod tests {
             },
             on_broken: None,
             latest_source: |_| crate::tools::LatestSource::SelfUpdating,
+            install_script: |_| None,
         }
     }
 
