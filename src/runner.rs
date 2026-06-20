@@ -47,6 +47,35 @@ impl Command {
             ],
         )
     }
+
+    /// Windows remote installer invocation. Some official installer scripts
+    /// rely on `Get-FileHash`, but user environments can launch Windows
+    /// PowerShell without the Utility module available. Keep the official
+    /// installer URL untouched and provide only a local SHA256 fallback in the
+    /// same session before `irm ... | iex` runs.
+    pub fn powershell_installer(script: &str) -> Command {
+        let bootstrap = concat!(
+            "if (-not (Get-Command Get-FileHash -ErrorAction SilentlyContinue)) { ",
+            "function Get-FileHash { ",
+            "param([Parameter(Mandatory=$true)][string]$Path,[string]$Algorithm='SHA256') ",
+            "if ($Algorithm -ne 'SHA256') { throw ('Unsupported hash algorithm: ' + $Algorithm) } ",
+            "$resolved=(Resolve-Path -LiteralPath $Path).Path; ",
+            "$stream=[System.IO.File]::OpenRead($resolved); ",
+            "$sha=$null; ",
+            "try { ",
+            "$sha=[System.Security.Cryptography.SHA256]::Create(); ",
+            "$bytes=$sha.ComputeHash($stream); ",
+            "$hex=-join ($bytes | ForEach-Object { $_.ToString('x2') }); ",
+            "[pscustomobject]@{ Algorithm=$Algorithm; Hash=$hex; Path=$resolved } ",
+            "} finally { ",
+            "$stream.Dispose(); ",
+            "if ($sha) { $sha.Dispose() } ",
+            "} ",
+            "} ",
+            "}; "
+        );
+        Command::powershell(&format!("{bootstrap}{script}"))
+    }
 }
 
 impl fmt::Display for Command {
@@ -264,6 +293,21 @@ mod tests {
                 "irm https://claude.ai/install.ps1 | iex",
             ]
         );
+    }
+
+    #[test]
+    fn powershell_installer_bootstraps_get_file_hash_fallback() {
+        let cmd = Command::powershell_installer("irm https://claude.ai/install.ps1 | iex");
+        assert_eq!(cmd.program, "powershell");
+        assert_eq!(&cmd.args[..3], ["-NoProfile", "-ExecutionPolicy", "Bypass"]);
+        let script = cmd.args.last().expect("script arg");
+        assert!(script.contains("Get-Command Get-FileHash"), "{script}");
+        assert!(script.contains("function Get-FileHash"), "{script}");
+        assert!(
+            script.contains("[System.Security.Cryptography.SHA256]::Create()"),
+            "{script}"
+        );
+        assert!(script.ends_with("irm https://claude.ai/install.ps1 | iex"));
     }
 
     #[test]

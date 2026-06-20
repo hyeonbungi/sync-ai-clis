@@ -37,7 +37,7 @@ fn install_dir(_os: &OsInfo) -> Option<PathBuf> {
 fn install(os: &OsInfo) -> Support<Vec<Command>> {
     Support::Supported(vec![match os.os {
         Os::MacOs | Os::Linux => Command::sh(&format!("curl -fsSL {INSTALL_SH_URL} | bash")),
-        Os::Windows => Command::powershell(&format!("irm {INSTALL_PS1_URL} | iex")),
+        Os::Windows => Command::powershell_installer(&format!("irm {INSTALL_PS1_URL} | iex")),
     }])
 }
 

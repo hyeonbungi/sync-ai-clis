@@ -48,6 +48,10 @@ fn rendered(plan: sync_ai_clis::tools::Support<Vec<sync_ai_clis::runner::Command
         .collect()
 }
 
+fn ps_installer(script: &str) -> String {
+    sync_ai_clis::runner::Command::powershell_installer(script).to_string()
+}
+
 #[test]
 fn registry_lists_five_tools_with_unique_ids() {
     let specs = registry();
@@ -70,9 +74,7 @@ fn claude_installs_via_official_installer_per_os() {
     );
     assert_eq!(
         rendered((tool.install)(&windows(22631))),
-        vec![
-            r#"powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://claude.ai/install.ps1 | iex""#
-        ]
+        vec![ps_installer("irm https://claude.ai/install.ps1 | iex")]
     );
 }
 
@@ -202,9 +204,7 @@ fn kiro_skips_windows_10_with_a_clear_reason() {
 fn kiro_installs_on_windows_11_with_official_powershell_installer() {
     assert_eq!(
         rendered((spec("kiro").install)(&windows(22631))),
-        vec![
-            r#"powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://cli.kiro.dev/install.ps1 | iex""#
-        ]
+        vec![ps_installer("irm https://cli.kiro.dev/install.ps1 | iex")]
     );
 }
 
@@ -240,9 +240,9 @@ fn antigravity_uses_official_installer_and_agy_update() {
     );
     assert_eq!(
         rendered((tool.install)(&windows(22631))),
-        vec![
-            r#"powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://antigravity.google/cli/install.ps1 | iex""#
-        ]
+        vec![ps_installer(
+            "irm https://antigravity.google/cli/install.ps1 | iex"
+        )]
     );
     assert_eq!(
         rendered((tool.update)(&macos(), InstallSource::Native)),
@@ -286,8 +286,11 @@ fn claude_linux_install_and_source_updates() {
 #[test]
 fn codex_windows_paths_use_wrapped_powershell() {
     let tool = spec("codex");
-    let expected = r#"powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://chatgpt.com/codex/install.ps1 | iex""#;
-    assert_eq!(rendered((tool.install)(&windows(22631))), vec![expected]);
+    let expected = ps_installer("irm https://chatgpt.com/codex/install.ps1 | iex");
+    assert_eq!(
+        rendered((tool.install)(&windows(22631))),
+        vec![expected.clone()]
+    );
     // Native update uses the self-update subcommand on Windows too.
     assert_eq!(
         rendered((tool.update)(&windows(22631), InstallSource::Native)),

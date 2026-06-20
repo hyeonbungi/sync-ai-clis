@@ -177,7 +177,7 @@ tests/
 - **설치 직후 PATH 미반영**: 첫 설치 시 새 바이너리가 현재 프로세스 PATH에 아직 없는 위치(`~/.local/bin`·`%LOCALAPPDATA%\agy\bin` 등)에 깔려, 직후 verify가 **설치 성공에도 실패**할 수 있음. → 각 ToolSpec에 **알려진 설치 경로(`install_dir`)** 를 두고 PATH 조회 실패 시 그 절대경로로 재확인. 그래도 없으면 "셸 재시작 후 재실행" 안내(FAIL 처리 아님). (원본 `hash -r`의 Rust판)
 - **전제조건(prerequisite) 감지**: npm 경로는 Node/npm, brew 경로는 brew 필요. 부재 시 암호 같은 실패 대신 `Unsupported("Node.js 필요")` 식 **명확한 SKIP**. (원본 `have brew` 가드 계승)
 - **보안/신뢰 모델**: 이 도구는 원격 설치 스크립트를 실행(`curl|bash`·`irm|iex`)한다. ① 설치/업데이트 URL은 **레지스트리에 하드코딩된 공식 HTTPS 상수만**(사용자·config가 임의 URL 주입 불가), ② 실행 전 동의(또는 `--yes`), ③ `--dry-run`이 **실제 실행될 명령을 그대로** 노출, ④ 미검증 소스 실행 거부. README에 신뢰 모델 명시(rustup·Homebrew 관례).
-- **Windows PowerShell 호출**: `irm…|iex` 류는 `powershell -NoProfile -ExecutionPolicy Bypass -Command "…"`로 감싸 실행(Windows PowerShell 5 vs `pwsh` 차이 고려).
+- **Windows PowerShell 호출**: `irm…|iex` 류는 `powershell -NoProfile -ExecutionPolicy Bypass -Command "…"`로 감싸 실행(Windows PowerShell 5 vs `pwsh` 차이 고려). 원격 `install.ps1` 실행 세션에는 `Get-FileHash`가 없을 때만 .NET SHA256 기반 fallback 함수를 먼저 정의한다. Claude Code·Codex 등 공식 설치 스크립트가 해시 검증에 `Get-FileHash`를 사용하므로, 사용자 PowerShell 환경에서 `Microsoft.PowerShell.Utility` 자동 로드가 깨져도 설치가 진행되게 하기 위함이다. 설치 URL은 여전히 레지스트리의 공식 HTTPS 상수만 사용한다.
 - **권한 상승(sudo/UAC)**: 유저공간 설치기 우선이라 대체로 불필요. **자동 sudo/관리자 승격은 절대 하지 않음** — 필요하면 그 사실을 드러내고 사용자가 직접 실행하도록 안내.
 
 ---

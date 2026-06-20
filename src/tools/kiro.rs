@@ -56,7 +56,7 @@ fn install(os: &OsInfo) -> Support<Vec<Command>> {
         Os::Windows if !os.is_windows_11() => {
             Support::Unsupported("Kiro requires Windows 11 (SPEC §7.4)")
         }
-        Os::Windows => Support::Supported(vec![Command::powershell(&format!(
+        Os::Windows => Support::Supported(vec![Command::powershell_installer(&format!(
             "irm {INSTALL_PS1_URL} | iex"
         ))]),
     }

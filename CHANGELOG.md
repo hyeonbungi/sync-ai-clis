@@ -2,6 +2,12 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.4.1 - 2026-06-20
+
+### Fixed
+
+- Windows native installers now bootstrap a local `Get-FileHash` fallback before running official `install.ps1` scripts. This keeps Claude Code, Codex, Kiro, and Antigravity installs working in PowerShell environments where `Microsoft.PowerShell.Utility` is unavailable, while leaving the hardcoded official HTTPS installer URLs unchanged.
+
 ## 0.4.0 - 2026-06-17
 
 ### Added
