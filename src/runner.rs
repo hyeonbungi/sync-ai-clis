@@ -57,7 +57,7 @@ impl Command {
         let bootstrap = concat!(
             "if (-not (Get-Command Get-FileHash -ErrorAction SilentlyContinue)) { ",
             "function Get-FileHash { ",
-            "param([Parameter(Mandatory=$true)][string]$Path,[string]$Algorithm='SHA256') ",
+            "param([Parameter(Mandatory=$true)][Alias('LiteralPath')][string]$Path,[string]$Algorithm='SHA256') ",
             "if ($Algorithm -ne 'SHA256') { throw ('Unsupported hash algorithm: ' + $Algorithm) } ",
             "$resolved=(Resolve-Path -LiteralPath $Path).Path; ",
             "$stream=[System.IO.File]::OpenRead($resolved); ",
@@ -303,6 +303,7 @@ mod tests {
         let script = cmd.args.last().expect("script arg");
         assert!(script.contains("Get-Command Get-FileHash"), "{script}");
         assert!(script.contains("function Get-FileHash"), "{script}");
+        assert!(script.contains("[Alias('LiteralPath')]"), "{script}");
         assert!(
             script.contains("[System.Security.Cryptography.SHA256]::Create()"),
             "{script}"

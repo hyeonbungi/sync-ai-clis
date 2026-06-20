@@ -2,6 +2,12 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.4.2 - 2026-06-20
+
+### Fixed
+
+- The Windows `Get-FileHash` fallback now accepts `-LiteralPath` as well as `-Path`. Codex's official `install.ps1` verifies its downloaded archive with `Get-FileHash -LiteralPath ...`, so 0.4.1 could still fail in PowerShell environments where `Microsoft.PowerShell.Utility` was unavailable.
+
 ## 0.4.1 - 2026-06-20
 
 ### Fixed
