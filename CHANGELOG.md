@@ -2,6 +2,12 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## 0.4.3 - 2026-07-02
+
+### Fixed
+
+- Windows native Codex updates now run the official `install.ps1` through sync-ai-clis' guarded PowerShell wrapper instead of delegating to `codex update`. This preserves the official installer source while adding `-NoProfile`, `CODEX_NON_INTERACTIVE=1`, and the local `Get-FileHash` fallback for the exact updater path that previously failed in PowerShell 7/Windows PowerShell mixed environments.
+
 ## 0.4.2 - 2026-06-20
 
 ### Fixed

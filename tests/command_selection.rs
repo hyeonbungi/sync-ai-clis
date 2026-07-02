@@ -127,7 +127,7 @@ fn codex_updates_by_source_and_uses_native_self_update() {
         rendered((tool.update)(&macos(), InstallSource::Npm)),
         vec!["npm install -g @openai/codex@latest"]
     );
-    // Native update = Codex's official self-update command.
+    // Native update = Codex's official self-update command on unix.
     assert_eq!(
         rendered((tool.update)(&macos(), InstallSource::Native)),
         vec!["codex update"]
@@ -287,14 +287,19 @@ fn claude_linux_install_and_source_updates() {
 fn codex_windows_paths_use_wrapped_powershell() {
     let tool = spec("codex");
     let expected = ps_installer("irm https://chatgpt.com/codex/install.ps1 | iex");
+    let expected_update = ps_installer(
+        "$env:CODEX_NON_INTERACTIVE=1; irm https://chatgpt.com/codex/install.ps1 | iex",
+    );
     assert_eq!(
         rendered((tool.install)(&windows(22631))),
         vec![expected.clone()]
     );
-    // Native update uses the self-update subcommand on Windows too.
+    // Codex's own Windows updater shells out to install.ps1 without our
+    // profile/hash guards, so sync-ai-clis runs the official installer
+    // directly through the guarded wrapper for Windows native updates.
     assert_eq!(
         rendered((tool.update)(&windows(22631), InstallSource::Native)),
-        vec!["codex update"]
+        vec![expected_update]
     );
     let on_broken = tool.on_broken.expect("codex recovery hook");
     let recovery: Vec<String> = on_broken(&windows(22631), InstallSource::Native)

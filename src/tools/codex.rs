@@ -1,7 +1,9 @@
-//! Codex CLI, OpenAI (SPEC §7.2). Native updates use the official
-//! `codex update` subcommand; the installer rerun remains the install and
-//! broken-binary recovery path. The npm package must be the scoped
-//! @openai/codex (the unscoped `codex` package is an unrelated 2012 project).
+//! Codex CLI, OpenAI (SPEC §7.2). Native updates normally use the official
+//! `codex update` subcommand; Windows native updates rerun the same official
+//! installer through our PowerShell compatibility wrapper because Codex's
+//! own updater shells out to `install.ps1` without `-NoProfile` or the local
+//! `Get-FileHash` fallback. The npm package must be the scoped @openai/codex
+//! (the unscoped `codex` package is an unrelated 2012 project).
 
 use std::path::PathBuf;
 
@@ -54,6 +56,11 @@ fn install(os: &OsInfo) -> Support<Vec<Command>> {
 
 fn update(os: &OsInfo, source: InstallSource) -> Support<Vec<Command>> {
     match source {
+        InstallSource::Native if os.os == Os::Windows => {
+            Support::Supported(vec![Command::powershell_installer(&format!(
+                "$env:CODEX_NON_INTERACTIVE=1; irm {INSTALL_PS1_URL} | iex"
+            ))])
+        }
         InstallSource::Native => Support::Supported(vec![Command::new("codex", &["update"])]),
         InstallSource::Brew => match os.os {
             Os::MacOs => {

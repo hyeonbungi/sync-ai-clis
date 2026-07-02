@@ -1,6 +1,6 @@
 [package]
 name = "sync-ai-clis"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2024"
 description = "Detect, install, and keep up to date multiple AI coding CLIs (Claude Code, Codex, Gemini, Kiro, Antigravity) with one command"
 authors = ["김현우 (hyeonbungi) <tech@indiedrive.co.kr>"]

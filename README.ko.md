@@ -40,7 +40,7 @@
 
 `sync-ai-clis`는 머신을 "알려진 AI CLI가 전부 설치되어 있고, 동작하고, 최신인 상태"로 맞추는(reconcile) 크로스플랫폼(macOS · Windows · Linux) Rust CLI입니다. 설치된 도구는 업데이트하고, 미설치 도구는 동의를 받아 설치하며, 작업이 끝나면 각 도구를 재검증합니다(`command -v`가 아니라 `--version`이 실제로 도는지 확인해 깨진 설치를 잡아냅니다).
 
-**현재 상태: 릴리스됨.** `list`·`doctor`·`check`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 테스트 132개와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
+**현재 상태: 릴리스됨.** `list`·`doctor`·`check`·`audit`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 테스트 150개와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
 
 ## At A Glance
 
@@ -50,9 +50,9 @@
 | 관리 도구 (v1) | `claude`, `codex`, `gemini`, `kiro-cli`, `agy` |
 | 플랫폼 | macOS · Windows · Linux |
 | 스택 | Rust (단일 바이너리) |
-| 상태 | 릴리스됨 — 3 OS 전부에서 엔진 검증 (오프라인 테스트 120개 + 실채널 CI) |
+| 상태 | 릴리스됨 — 3 OS 전부에서 엔진 검증 (오프라인 테스트 150개 + 실채널 CI) |
 | 배포 | GitHub Releases · Homebrew tap · npm · crates.io · winget · Scoop · ghcr (Docker) |
-| 테스트 | 오프라인 120개 + Docker 배포판 매트릭스 + 3 OS 실채널 CI |
+| 테스트 | 오프라인 150개 + Docker 배포판 매트릭스 + 3 OS 실채널 CI |
 | 라이선스 | [MIT](./LICENSE) |
 | 저작자 | [hyeonbungi](https://github.com/hyeonbungi) |
 
@@ -135,7 +135,7 @@ sync-ai-clis --json          # 자동화용 JSON 요약
 ## 개발
 
 ```bash
-cargo test                 # 오프라인 테스트 120개 — 네트워크·시스템 변경 없음
+cargo test                 # 오프라인 테스트 150개 — 네트워크·시스템 변경 없음
 cargo fmt --check && cargo clippy --all-targets -- -D warnings
 cargo run -- list          # 읽기 전용: 도구 감지·버전 표
 cargo run -- --dry-run     # 실행될 명령만 그대로 출력, 실행 없음
