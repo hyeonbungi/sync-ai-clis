@@ -70,7 +70,7 @@ fn claude_installs_via_official_installer_per_os() {
     let tool = spec("claude");
     assert_eq!(
         rendered((tool.install)(&macos())),
-        vec![r#"sh -c "curl -fsSL https://claude.ai/install.sh | bash""#]
+        vec![installer("https://claude.ai/install.sh", "bash")]
     );
     assert_eq!(
         rendered((tool.install)(&windows(22631))),
@@ -106,7 +106,7 @@ fn codex_missing_on_linux_installs_via_native_installer() {
     // SPEC §8.1 example: (os=linux, tool=codex, 미설치, --yes) → native installer.
     assert_eq!(
         rendered((spec("codex").install)(&linux_glibc(2, 39))),
-        vec![r#"sh -c "curl -fsSL https://chatgpt.com/codex/install.sh | sh""#]
+        vec![installer("https://chatgpt.com/codex/install.sh", "sh")]
     );
 }
 
@@ -147,7 +147,7 @@ fn codex_on_broken_reinstalls_per_source() {
     );
     assert_eq!(
         render(on_broken(&linux_glibc(2, 39), InstallSource::Native)),
-        vec![r#"sh -c "curl -fsSL https://chatgpt.com/codex/install.sh | sh""#]
+        vec![installer("https://chatgpt.com/codex/install.sh", "sh")]
     );
 }
 
@@ -213,11 +213,11 @@ fn kiro_installs_on_unix_and_self_updates() {
     let tool = spec("kiro");
     assert_eq!(
         rendered((tool.install)(&macos())),
-        vec![r#"sh -c "curl -fsSL https://cli.kiro.dev/install | bash""#]
+        vec![installer("https://cli.kiro.dev/install", "bash")]
     );
     assert_eq!(
         rendered((tool.install)(&linux_glibc(2, 31))),
-        vec![r#"sh -c "curl -fsSL https://cli.kiro.dev/install | bash""#]
+        vec![installer("https://cli.kiro.dev/install", "bash")]
     );
     assert_eq!(
         rendered((tool.update)(&linux_glibc(2, 39), InstallSource::Native)),
@@ -236,7 +236,10 @@ fn antigravity_uses_official_installer_and_agy_update() {
     let tool = spec("antigravity");
     assert_eq!(
         rendered((tool.install)(&linux_glibc(2, 39))),
-        vec![r#"sh -c "curl -fsSL https://antigravity.google/cli/install.sh | bash""#]
+        vec![installer(
+            "https://antigravity.google/cli/install.sh",
+            "bash"
+        )]
     );
     assert_eq!(
         rendered((tool.install)(&windows(22631))),
@@ -270,7 +273,7 @@ fn claude_linux_install_and_source_updates() {
     let tool = spec("claude");
     assert_eq!(
         rendered((tool.install)(&linux_glibc(2, 39))),
-        vec![r#"sh -c "curl -fsSL https://claude.ai/install.sh | bash""#]
+        vec![installer("https://claude.ai/install.sh", "bash")]
     );
     assert_eq!(
         rendered((tool.update)(&linux_glibc(2, 39), InstallSource::Npm)),
@@ -430,4 +433,20 @@ fn claude_knows_its_install_dir_for_path_recheck() {
     let tool = spec("claude");
     let dir = (tool.install_dir)(&macos()).expect("claude install dir is known");
     assert!(dir.ends_with(".local/bin"), "dir was: {}", dir.display());
+}
+
+fn installer(url: &str, shell: &str) -> String {
+    sync_ai_clis::runner::Command::unix_installer(url, shell).to_string()
+}
+
+#[test]
+fn codex_npm_recovery_preserves_the_original_channel_on_every_os() {
+    let tool = spec("codex");
+    let recovery = tool.on_broken.unwrap();
+    for os in [macos(), windows(22631), linux_glibc(2, 39)] {
+        let commands = recovery(&os, InstallSource::Npm);
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].program, "npm");
+        assert_eq!(commands[0].args, ["install", "-g", "@openai/codex@latest"]);
+    }
 }

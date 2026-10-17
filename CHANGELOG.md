@@ -2,6 +2,17 @@
 
 All notable changes to `sync-ai-clis` are tracked here.
 
+## Unreleased
+
+### Fixed
+
+- Unix installers finish downloading before execution; failed or partial downloads no longer produce a successful empty-shell exit.
+- Windows detection and execution resolve `.exe`, `.cmd`, and `.bat` candidates without selecting npm's extensionless POSIX shim.
+- npm command shims resolve to their package and owning npm, including a missing package entry point, so updates and Codex recovery preserve the npm channel.
+- Installation prompts go to stderr, keeping `--json` stdout parseable when installation is declined.
+- `doctor` finds Windows executables in known install directories even before PATH refresh.
+- Windows Integration validates Kiro against the CLI's Windows build gate and verifies successful installs after refreshing PATH.
+
 ## 0.4.3 - 2026-07-02
 
 ### Fixed

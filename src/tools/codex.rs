@@ -49,7 +49,7 @@ fn install_dir(os: &OsInfo) -> Option<PathBuf> {
 
 fn install(os: &OsInfo) -> Support<Vec<Command>> {
     Support::Supported(vec![match os.os {
-        Os::MacOs | Os::Linux => Command::sh(&format!("curl -fsSL {INSTALL_SH_URL} | sh")),
+        Os::MacOs | Os::Linux => Command::unix_installer(INSTALL_SH_URL, "sh"),
         Os::Windows => Command::powershell_installer(&format!("irm {INSTALL_PS1_URL} | iex")),
     }])
 }
@@ -91,6 +91,10 @@ fn on_broken(os: &OsInfo, source: InstallSource) -> Vec<Command> {
         InstallSource::Brew if os.os == Os::MacOs => {
             vec![Command::new("brew", &["reinstall", "--cask", "codex"])]
         }
+        InstallSource::Npm => vec![Command::new(
+            "npm",
+            &["install", "-g", "@openai/codex@latest"],
+        )],
         _ => install(os).supported().unwrap_or_default(),
     }
 }

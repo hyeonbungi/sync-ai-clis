@@ -32,6 +32,15 @@ impl Command {
         Command::new("sh", &["-c", script])
     }
 
+    /// Download completely before executing. A failed curl must not be
+    /// hidden by a successful shell reading an empty or partial script.
+    pub fn unix_installer(url: &str, interpreter: &str) -> Command {
+        debug_assert!(matches!(interpreter, "sh" | "bash"));
+        Command::sh(&format!(
+            "installer_script=$(curl -fsSL {url}) && printf '%s\\n' \"$installer_script\" | {interpreter}"
+        ))
+    }
+
     /// Windows PowerShell invocation wrapped per SPEC §5.5:
     /// `powershell -NoProfile -ExecutionPolicy Bypass -Command "<script>"`
     /// (Windows PowerShell 5 compatible).
@@ -125,29 +134,35 @@ impl RealRunner {
     pub fn quiet() -> RealRunner {
         RealRunner { quiet: true }
     }
+
+    fn process(cmd: &Command) -> std::process::Command {
+        // Rust supports .cmd/.bat invocation with its own argument escaping,
+        // but requires the extension to be explicit. Never build cmd /c text.
+        #[cfg(windows)]
+        let program = crate::source::resolve_windows_program(&cmd.program);
+        #[cfg(not(windows))]
+        let program = std::path::PathBuf::from(&cmd.program);
+        let mut process = std::process::Command::new(program);
+        process.args(&cmd.args);
+        process
+    }
 }
 
 impl CommandRunner for RealRunner {
     fn run(&mut self, cmd: &Command) -> io::Result<bool> {
         if self.quiet {
-            let out = std::process::Command::new(&cmd.program)
-                .args(&cmd.args)
-                .output()?;
+            let out = Self::process(cmd).output()?;
             let mut stderr = io::stderr();
             let _ = io::Write::write_all(&mut stderr, &out.stdout);
             let _ = io::Write::write_all(&mut stderr, &out.stderr);
             return Ok(out.status.success());
         }
-        let status = std::process::Command::new(&cmd.program)
-            .args(&cmd.args)
-            .status()?;
+        let status = Self::process(cmd).status()?;
         Ok(status.success())
     }
 
     fn capture(&mut self, cmd: &Command) -> io::Result<CaptureResult> {
-        let out = std::process::Command::new(&cmd.program)
-            .args(&cmd.args)
-            .output()?;
+        let out = Self::process(cmd).output()?;
         Ok(CaptureResult {
             success: out.status.success(),
             stdout: String::from_utf8_lossy(&out.stdout).trim().to_string(),
@@ -259,6 +274,21 @@ impl CommandRunner for DryRunRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn real_runner_executes_a_batch_shim_with_explicit_resolution() {
+        let dir = std::env::temp_dir().join(format!("sync batch shim {}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let shim = dir.join("fixture.cmd");
+        std::fs::write(&shim, "@echo off\r\necho %~1\r\nexit /b 0\r\n").unwrap();
+        let command = Command::new(&dir.join("fixture").to_string_lossy(), &["space & symbol"]);
+        let cap = RealRunner::interactive().capture(&command).unwrap();
+        assert!(cap.success);
+        assert_eq!(cap.stdout, "space & symbol");
+        assert!(RealRunner::quiet().run(&command).unwrap());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn renders_args_and_quotes_whitespace() {
@@ -420,6 +450,36 @@ mod ordering_tests {
 #[cfg(unix)]
 mod quiet_tests {
     use super::*;
+
+    #[test]
+    fn failed_download_never_executes_partial_installer() {
+        for interpreter in ["sh", "bash"] {
+            let plan = Command::unix_installer("https://example.invalid/install", interpreter);
+            let wrapped = Command::sh(&format!(
+                "curl() {{ printf 'echo MUST_NOT_RUN\\n'; return 22; }}; {}",
+                plan.args[1]
+            ));
+            let cap = RealRunner::interactive().capture(&wrapped).unwrap();
+            assert!(!cap.success);
+            assert!(
+                cap.stdout.is_empty(),
+                "partial installer ran: {}",
+                cap.stdout
+            );
+        }
+    }
+
+    #[test]
+    fn successful_download_executes_the_complete_installer() {
+        let plan = Command::unix_installer("https://example.invalid/install", "sh");
+        let wrapped = Command::sh(&format!(
+            "curl() {{ printf 'printf installed\\n'; }}; {}",
+            plan.args[1]
+        ));
+        let cap = RealRunner::interactive().capture(&wrapped).unwrap();
+        assert!(cap.success);
+        assert_eq!(cap.stdout, "installed");
+    }
 
     #[test]
     fn quiet_real_runner_reports_status_without_touching_stdout() {

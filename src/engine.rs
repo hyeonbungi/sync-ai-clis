@@ -304,11 +304,7 @@ impl Engine<'_> {
 }
 
 fn install_dir_candidates(os: &OsInfo, dir: &std::path::Path, bin: &str) -> Vec<PathBuf> {
-    let mut candidates = vec![dir.join(bin)];
-    if os.os == Os::Windows {
-        candidates.push(dir.join(format!("{bin}.exe")));
-    }
-    candidates
+    source::binary_candidates(dir, bin, os.os == Os::Windows)
 }
 
 fn first_line(s: &str) -> String {

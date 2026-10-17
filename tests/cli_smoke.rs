@@ -9,6 +9,33 @@ fn bin() -> Command {
 }
 
 #[test]
+fn json_stays_parseable_when_a_missing_install_is_declined() {
+    use std::io::Write;
+    use std::process::Stdio;
+    let root = std::env::temp_dir().join(format!("sync-json-prompt-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let mut child = bin()
+        .args(["--dry-run", "--json", "--only", "claude"])
+        .env("PATH", "")
+        .env("HOME", &root)
+        .env("USERPROFILE", &root)
+        .env("APPDATA", &root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(b"n\n").unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    let rows: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(rows[0]["id"], "claude");
+    assert_eq!(rows[0]["result"], "skip");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Install it?"));
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn help_describes_the_real_cli() {
     let out = bin().arg("--help").output().unwrap();
     assert!(out.status.success());

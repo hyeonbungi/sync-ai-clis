@@ -41,9 +41,10 @@ impl InstallSource {
 }
 
 use std::ffi::OsStr;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
-/// Finds `bin` on the process PATH (`bin.exe` is also tried, for Windows).
+/// Finds a native executable or Windows command shim on the process PATH.
 pub fn find_in_path(bin: &str) -> Option<PathBuf> {
     find_in_path_env(bin, std::env::var_os("PATH")?.as_ref())
 }
@@ -57,12 +58,16 @@ pub fn find_in_path_env(bin: &str, path_var: &OsStr) -> Option<PathBuf> {
 /// Every PATH match in search order (one per directory) — `doctor` needs the
 /// shadowed copies that `find_in_path_env` skips past.
 pub fn find_all_in_path_env(bin: &str, path_var: &OsStr) -> Vec<PathBuf> {
+    find_all_in_path_env_for(bin, path_var, cfg!(windows))
+}
+
+pub fn find_all_in_path_env_for(bin: &str, path_var: &OsStr, windows: bool) -> Vec<PathBuf> {
     let mut matches = Vec::new();
     for dir in std::env::split_paths(path_var) {
         if dir.as_os_str().is_empty() {
             continue;
         }
-        if let Some(hit) = [dir.join(bin), dir.join(format!("{bin}.exe"))]
+        if let Some(hit) = binary_candidates(&dir, bin, windows)
             .into_iter()
             .find(|candidate| candidate.is_file())
         {
@@ -70,6 +75,87 @@ pub fn find_all_in_path_env(bin: &str, path_var: &OsStr) -> Vec<PathBuf> {
         }
     }
     matches
+}
+
+/// Shared by PATH detection, post-install verification and doctor.
+/// On Windows, never prefer npm's extensionless POSIX shell shim.
+pub fn binary_candidates(dir: &Path, bin: &str, windows: bool) -> Vec<PathBuf> {
+    if Path::new(bin).extension().is_some() {
+        return vec![dir.join(bin)];
+    }
+    if windows {
+        ["exe", "cmd", "bat"]
+            .iter()
+            .map(|ext| dir.join(format!("{bin}.{ext}")))
+            .collect()
+    } else {
+        vec![dir.join(bin)]
+    }
+}
+
+/// Resolve the extension before passing a Windows program to Rust's
+/// process API; .cmd/.bat argument escaping remains Rust's responsibility.
+#[cfg(windows)]
+pub fn resolve_windows_program(program: &str) -> PathBuf {
+    let path = Path::new(program);
+    if path.components().count() > 1 || path.is_absolute() {
+        let parent = path.parent().unwrap_or_else(|| Path::new("."));
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        binary_candidates(parent, &name, true)
+            .into_iter()
+            .find(|p| p.is_file())
+            .unwrap_or_else(|| path.to_path_buf())
+    } else {
+        find_in_path(program).unwrap_or_else(|| path.to_path_buf())
+    }
+}
+
+/// npm's Windows shims are ordinary files, not symlinks. Read only the
+/// known quoted, shim-relative node_modules target forms; never execute a
+/// shim to determine its owner or interpret arbitrary shell expressions.
+fn installed_target(path: &Path) -> PathBuf {
+    let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    if classify_path(&resolved.to_string_lossy()) != InstallSource::Native {
+        return resolved;
+    }
+    let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if !matches!(extension.to_ascii_lowercase().as_str(), "" | "cmd" | "ps1") {
+        return resolved;
+    }
+    let Ok(file) = std::fs::File::open(&resolved) else {
+        return resolved;
+    };
+    let mut text = String::new();
+    if file.take(64 * 1024).read_to_string(&mut text).is_err() {
+        return resolved;
+    }
+    let Some(parent) = resolved.parent() else {
+        return resolved;
+    };
+    for marker in [
+        "\"%dp0%\\",
+        "\"%~dp0\\",
+        "\"$basedir/",
+        "\"$basedir\\",
+        "\"$basedir_win/",
+    ] {
+        for tail in text.split(marker).skip(1) {
+            let Some(relative) = tail.split('"').next() else {
+                continue;
+            };
+            let relative = relative.replace('\\', "/");
+            if !relative.starts_with("node_modules/")
+                || relative.split('/').any(|part| matches!(part, ".." | "."))
+            {
+                continue;
+            }
+            let target = parent.join(relative);
+            if parent.join("node_modules").is_dir() {
+                return std::fs::canonicalize(&target).unwrap_or(target);
+            }
+        }
+    }
+    resolved
 }
 
 /// Classifies how a binary was installed from its **resolved** path.
@@ -99,7 +185,7 @@ pub fn classify_path(resolved_path: &str) -> InstallSource {
 /// Resolves symlinks (npm/brew shims point into their stores) and classifies.
 /// Unresolvable paths classify as found.
 pub fn detect_from_path(path: &Path) -> InstallSource {
-    let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let resolved = installed_target(path);
     classify_path(&resolved.to_string_lossy())
 }
 
@@ -111,7 +197,7 @@ pub fn detect_from_path(path: &Path) -> InstallSource {
 /// instead of an update (SPEC §11, found live 2026-06-11). None when the
 /// layout doesn't match — callers fall back to plain `npm`.
 pub fn owning_npm(bin_path: &Path) -> Option<PathBuf> {
-    let resolved = std::fs::canonicalize(bin_path).unwrap_or_else(|_| bin_path.to_path_buf());
+    let resolved = installed_target(bin_path);
     for ancestor in resolved.ancestors() {
         if ancestor
             .file_name()
@@ -277,13 +363,40 @@ mod tests {
         let (first, second) = (root.join("a"), root.join("b"));
         std::fs::create_dir_all(&first).unwrap();
         std::fs::create_dir_all(&second).unwrap();
-        std::fs::write(first.join("footool"), "#!/bin/sh\n").unwrap();
-        std::fs::write(second.join("footool"), "#!/bin/sh\n").unwrap();
+        std::fs::write(
+            first.join(if cfg!(windows) {
+                "footool.exe"
+            } else {
+                "footool"
+            }),
+            "#!/bin/sh\n",
+        )
+        .unwrap();
+        std::fs::write(
+            second.join(if cfg!(windows) {
+                "footool.exe"
+            } else {
+                "footool"
+            }),
+            "#!/bin/sh\n",
+        )
+        .unwrap();
 
         let path_var = std::env::join_paths([first.clone(), second.clone()]).unwrap();
         assert_eq!(
             find_all_in_path_env("footool", &path_var),
-            vec![first.join("footool"), second.join("footool")],
+            vec![
+                first.join(if cfg!(windows) {
+                    "footool.exe"
+                } else {
+                    "footool"
+                }),
+                second.join(if cfg!(windows) {
+                    "footool.exe"
+                } else {
+                    "footool"
+                })
+            ],
             "every match, PATH order"
         );
         assert!(find_all_in_path_env("missing-tool", &path_var).is_empty());
@@ -295,7 +408,11 @@ mod tests {
     fn finds_binaries_on_an_injected_path() {
         let dir = std::env::temp_dir().join(format!("sync-ai-clis-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let bin = dir.join("footool");
+        let bin = dir.join(if cfg!(windows) {
+            "footool.exe"
+        } else {
+            "footool"
+        });
         std::fs::write(&bin, "#!/bin/sh\n").unwrap();
 
         let path_var = std::env::join_paths([dir.clone()]).unwrap();
@@ -324,5 +441,71 @@ mod tests {
         assert_eq!(detect_from_path(&plain), InstallSource::Native);
 
         std::fs::remove_dir_all(&root).ok();
+    }
+}
+
+#[cfg(test)]
+mod windows_regression_tests {
+    use super::*;
+
+    #[test]
+    fn windows_lookup_ignores_posix_shim_and_selects_native_commands() {
+        let dir = std::env::temp_dir().join(format!("sync-lookup-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = std::env::join_paths([&dir]).unwrap();
+        std::fs::write(dir.join("gemini"), "#!/bin/sh\n").unwrap();
+        std::fs::write(dir.join("gemini.ps1"), "# powershell shim\n").unwrap();
+        assert!(find_all_in_path_env_for("gemini", &path, true).is_empty());
+        std::fs::write(dir.join("gemini.cmd"), "@echo off\n").unwrap();
+        assert_eq!(
+            find_all_in_path_env_for("gemini", &path, true),
+            vec![dir.join("gemini.cmd")]
+        );
+        std::fs::write(dir.join("gemini.exe"), "fixture").unwrap();
+        assert_eq!(
+            find_all_in_path_env_for("gemini", &path, true),
+            vec![dir.join("gemini.exe")]
+        );
+        assert_eq!(
+            find_all_in_path_env_for("gemini.cmd", &path, true),
+            vec![dir.join("gemini.cmd")]
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn npm_shims_resolve_source_and_owner_without_executing() {
+        let root = std::env::temp_dir().join(format!("sync-shim-{}", std::process::id()));
+        let package = root.join("node_modules/@google/gemini-cli");
+        std::fs::create_dir_all(&package).unwrap();
+        std::fs::write(root.join("npm.cmd"), "@echo off\r\n").unwrap();
+        // Missing JS entry points must still be classified as npm so that
+        // a broken package can be repaired through its original channel.
+        let root = std::fs::canonicalize(&root).unwrap();
+        let target = root.join("node_modules/@google/gemini-cli/missing.js");
+        for (index, content) in [
+            r#"@echo off
+node "%dp0%\node_modules\@google\gemini-cli\missing.js" %*"#,
+            r#"& "$basedir/node_modules/@google/gemini-cli/missing.js" $args"#,
+            r#"exec node "$basedir_win/node_modules/@google/gemini-cli/missing.js" "$@""#,
+        ]
+        .iter()
+        .enumerate()
+        {
+            let shim = root.join(format!("gemini-{index}.cmd"));
+            std::fs::write(&shim, content).unwrap();
+            assert_eq!(installed_target(&shim), target);
+            assert_eq!(detect_from_path(&shim), InstallSource::Npm);
+            assert_eq!(owning_npm(&shim), Some(root.join("npm.cmd")));
+        }
+        let unrelated = root.join("unrelated.cmd");
+        std::fs::write(
+            &unrelated,
+            r#"echo node_modules; node "%dp0%\node_modules\..\outside.js""#,
+        )
+        .unwrap();
+        assert_eq!(detect_from_path(&unrelated), InstallSource::Native);
+        assert_eq!(owning_npm(&unrelated), None);
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

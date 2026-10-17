@@ -8,7 +8,7 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use crate::os::OsInfo;
+use crate::os::{Os, OsInfo};
 use crate::runner::{Command, CommandRunner};
 use crate::source::{self, InstallSource};
 use crate::tools::ToolSpec;
@@ -56,7 +56,11 @@ pub fn diagnose(
     path_var: &OsStr,
     probe: &mut dyn CommandRunner,
 ) -> Diagnosis {
-    let hits = dedup_by_target(source::find_all_in_path_env(tool.bin, path_var));
+    let hits = dedup_by_target(source::find_all_in_path_env_for(
+        tool.bin,
+        path_var,
+        os.os == Os::Windows,
+    ));
 
     if hits.is_empty() {
         return diagnose_off_path(tool, os, probe);
@@ -94,9 +98,11 @@ pub fn diagnose(
 /// Nothing on PATH: the binary may still sit in the tool's known install
 /// dir (same recheck the engine does after a fresh install, SPEC §5.5).
 fn diagnose_off_path(tool: &ToolSpec, os: &OsInfo, probe: &mut dyn CommandRunner) -> Diagnosis {
-    let off_path_bin = (tool.install_dir)(os)
-        .map(|dir| dir.join(tool.bin))
-        .filter(|bin| bin.is_file());
+    let off_path_bin = (tool.install_dir)(os).and_then(|dir| {
+        source::binary_candidates(&dir, tool.bin, os.os == Os::Windows)
+            .into_iter()
+            .find(|bin| bin.is_file())
+    });
 
     match off_path_bin {
         Some(bin) => {
@@ -287,6 +293,40 @@ mod tests {
             windows_build: None,
             libc: None,
         }
+    }
+
+    #[test]
+    fn windows_exe_outside_path_is_not_missing() {
+        let os = OsInfo {
+            os: Os::Windows,
+            arch: "x86_64".into(),
+            windows_build: Some(26100),
+            libc: None,
+        };
+        let tool = ToolSpec {
+            install_dir: |_| {
+                Some(
+                    std::env::temp_dir()
+                        .join(format!("sync-doctor-win-exe-{}", std::process::id())),
+                )
+            },
+            ..footool()
+        };
+        let dir = (tool.install_dir)(&os).unwrap();
+        std::fs::create_dir_all(&dir).unwrap();
+        let binary = dir.join("footool.exe");
+        std::fs::write(&binary, "fixture").unwrap();
+        let mut probe = MockRunner::new();
+        probe.script_capture(
+            &Command::new(&binary.to_string_lossy(), &["--version"]).to_string(),
+            true,
+            "1.0.0",
+        );
+        let diagnosis = diagnose(&tool, &os, OsStr::new(""), &mut probe);
+        assert_eq!(diagnosis.health, Health::NotOnPath);
+        assert_eq!(diagnosis.locations[0].path, binary);
+        assert_eq!(diagnosis.locations[0].version.as_deref(), Some("1.0.0"));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     /// Offline fixture tool. `install_dir` points at a per-process temp dir

@@ -50,9 +50,9 @@ fn install_dir(os: &OsInfo) -> Option<PathBuf> {
 
 fn install(os: &OsInfo) -> Support<Vec<Command>> {
     match os.os {
-        Os::MacOs | Os::Linux => Support::Supported(vec![Command::sh(&format!(
-            "curl -fsSL {INSTALL_URL} | bash"
-        ))]),
+        Os::MacOs | Os::Linux => {
+            Support::Supported(vec![Command::unix_installer(INSTALL_URL, "bash")])
+        }
         Os::Windows if !os.is_windows_11() => {
             Support::Unsupported("Kiro requires Windows 11 (SPEC §7.4)")
         }

@@ -219,8 +219,8 @@ fn list(tools: &[ToolSpec]) -> i32 {
 }
 
 fn prompt_install(display: &str) -> bool {
-    print!("{display} is not installed. Install it? (y/N) ");
-    std::io::stdout().flush().ok();
+    eprint!("{display} is not installed. Install it? (y/N) ");
+    std::io::stderr().flush().ok();
     let mut answer = String::new();
     if std::io::stdin().read_line(&mut answer).is_err() {
         return false;
