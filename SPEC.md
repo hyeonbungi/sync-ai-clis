@@ -257,6 +257,7 @@ codex  = "npm"
 - **설치 위치**: macOS `/Applications/Kiro CLI.app/Contents/MacOS`, linux `~/.local/bin`, Windows `C:\Program Files\Kiro-Cli`
 - **Homebrew/npm 없음**
 - **제약**: Windows는 **Win11 필수** → Win10이면 `Unsupported("Kiro는 Windows 11 필요")`로 SKIP
+- **실제 판별과 CI**: 현재 구현은 제품명 대신 Windows 빌드 번호 `>=22000`으로 설치 가능 여부를 판별한다. Server 2022(20348)는 SKIP, Server 2025(26100)는 설치를 시도한다. 2026-10-17 Integration에서 Server 2025의 Kiro 2.32.0 MSI 설치 성공을 확인했으나, 이는 공식 문서의 Windows 11 지원 범위를 Server 전체로 확장한다는 뜻은 아니다. CI는 이 빌드 조건과 일치하는 결과를 검증하고, `ok`이면 PATH 갱신 후 `--version` 실행도 별도로 확인한다.
 
 ### 7.5 Antigravity (`agy`, Google)
 - **install** mac/linux: `curl -fsSL https://antigravity.google/cli/install.sh | bash` · win(PowerShell, WSL 불필요): `irm https://antigravity.google/cli/install.ps1 | iex`

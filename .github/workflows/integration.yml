@@ -4,16 +4,19 @@
 # dispatch and a weekly schedule instead of every push (macOS minutes bill
 # 10x on private repos).
 #
-# Known limitation: GitHub Windows runners are Windows Server, not Windows 11,
-# so Kiro's positive install path cannot run here — this workflow pins that
-# kiro is a clear SKIP either way (Server 2022 fails the build>=22000 gate;
-# Server 2025 passes it but hits the unconfirmed-command skip, SPEC §11
-# backlog #2 tracks real-Win11 verification).
+# Windows runners use Windows Server. Match the CLI's build>=22000 gate:
+# Server 2022 skips; Server 2025 attempts the confirmed PowerShell installer.
+# A Server success does not establish support for every Windows 11 system.
 name: Integration
 
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: "Integration jobs to run (use windows for focused verification)"
+        default: all
+        type: choice
+        options: [all, windows]
       matrix:
         description: "Linux docker matrix size (smoke | full)"
         default: smoke
@@ -29,10 +32,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux-docker:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'all' }}
     name: linux docker (${{ inputs.matrix || 'full' }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - name: Run real install/update matrix in containers
@@ -44,16 +53,20 @@ jobs:
         run: docker/run-matrix.sh
 
   linux-musl:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'all' }}
     name: linux musl (experimental)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     continue-on-error: true # upstream installers may not ship musl builds
     steps:
       - uses: actions/checkout@v5
       - run: RUN_MUSL=1 MATRIX=smoke docker/run-matrix.sh
 
   macos-real:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'all' }}
     name: macos real channels (5 tools)
     runs-on: macos-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
@@ -83,19 +96,49 @@ jobs:
           ./target/release/sync-ai-clis list
 
   windows-real:
-    name: windows real channels (+ kiro skip pin)
+    name: windows real channels (kiro build gate)
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release
-      - name: Real sync — native PowerShell installers, kiro must skip
+      - name: Record Windows build using the CLI's version source
+        shell: pwsh
+        run: |
+          $version = cmd /c ver
+          $build = 0 # Unknown build: the CLI also treats this as unsupported.
+          if ($version -match '\[Version \d+\.\d+\.(\d+)[^\]]*\]') {
+            $build = [uint32]$Matches[1]
+          }
+          Write-Host "Windows build: $build"
+          "KIRO_WINDOWS_BUILD=$build" >> $env:GITHUB_ENV
+      - name: Real sync — native PowerShell installers, validate Kiro build gate
         shell: bash
         run: |
           ./target/release/sync-ai-clis.exe --yes --only claude,antigravity,kiro --json > result.json
           cat result.json
-          jq -e '(map(select(.id == "claude" or .id == "antigravity")) | length == 2 and all(.result == "ok")) and (map(select(.id == "kiro")) | all(.result == "skip" and .reason != null))' result.json
+          jq -e --argjson windows_build "$KIRO_WINDOWS_BUILD" -f .github/scripts/windows-results.jq result.json
+      - name: Verify Kiro runs after a successful install
+        shell: pwsh
+        run: |
+          $kiro = @(Get-Content -Raw result.json | ConvertFrom-Json | Where-Object id -eq 'kiro')
+          if ($kiro.Count -ne 1) { throw 'Expected exactly one Kiro result' }
+          if ($kiro[0].result -eq 'skip') {
+            Write-Host "Kiro skipped: $($kiro[0].reason)"
+          } else {
+            # MSI updates registry PATH, not the runner process environment.
+            $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+            $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+            $env:Path = "$machinePath;$userPath;$env:Path"
+            $command = Get-Command kiro-cli -CommandType Application -ErrorAction Stop
+            $version = & $command.Source --version
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($version -join "`n"))) {
+              throw 'Kiro installed but --version did not succeed'
+            }
+            Write-Host ($version -join "`n")
+          }
       - name: Verify antigravity at its known install dir
         shell: pwsh
         run: |

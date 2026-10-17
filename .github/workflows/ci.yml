@@ -25,6 +25,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+      - name: Test Windows integration result validation offline
+        if: runner.os == 'Linux'
+        run: python3 -m unittest discover -s tests -p 'test_integration_*.py' -v
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
