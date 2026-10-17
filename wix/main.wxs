@@ -69,7 +69,7 @@
 
         <Package Id='*'
             Keywords='Installer'
-            Description='Detect, install, and keep up to date multiple AI coding CLIs (Claude Code, Codex, Gemini, Kiro, Antigravity) with one command'
+            Description='Detect, install, and keep up to date multiple AI coding CLIs (Claude Code, Codex, Antigravity) with one command'
             Manufacturer='김현우 (hyeonbungi)'
             InstallerVersion='450'
             Languages='1033'

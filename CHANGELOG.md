@@ -4,6 +4,10 @@ All notable changes to `sync-ai-clis` are tracked here.
 
 ## Unreleased
 
+### Removed
+
+- Gemini CLI and Kiro CLI are no longer registered or installed. Remove their IDs from existing configuration. Existing installations are left untouched.
+
 ### Fixed
 
 - Unix installers finish downloading before execution; failed or partial downloads no longer produce a successful empty-shell exit.
@@ -11,7 +15,7 @@ All notable changes to `sync-ai-clis` are tracked here.
 - npm command shims resolve to their package and owning npm, including a missing package entry point, so updates and Codex recovery preserve the npm channel.
 - Installation prompts go to stderr, keeping `--json` stdout parseable when installation is declined.
 - `doctor` finds Windows executables in known install directories even before PATH refresh.
-- Windows Integration validates Kiro against the CLI's Windows build gate and verifies successful installs after refreshing PATH.
+- Integration validates the exact supported tool set; removed tools are no longer installed by macOS or Windows jobs.
 
 ## 0.4.3 - 2026-07-02
 

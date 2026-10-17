@@ -32,7 +32,7 @@
   <a href="./README.md">English</a> | 한국어
 </p>
 
-> 여러 AI 코딩 CLI(Claude Code · Codex · Gemini · Kiro · Antigravity)를 한 명령으로 감지·설치·최신 유지.
+> 여러 AI 코딩 CLI(Claude Code · Codex · Antigravity)를 한 명령으로 감지·설치·최신 유지.
 
 <p align="center">
   <img alt="sync-ai-clis --dry-run 출력: 도구별 감지된 설치 채널과 실제 실행될 명령" src="https://raw.githubusercontent.com/hyeonbungi/sync-ai-clis/main/.github/assets/terminal-demo.svg" width="600">
@@ -40,21 +40,23 @@
 
 `sync-ai-clis`는 머신을 "알려진 AI CLI가 전부 설치되어 있고, 동작하고, 최신인 상태"로 맞추는(reconcile) 크로스플랫폼(macOS · Windows · Linux) Rust CLI입니다. 설치된 도구는 업데이트하고, 미설치 도구는 동의를 받아 설치하며, 작업이 끝나면 각 도구를 재검증합니다(`command -v`가 아니라 `--version`이 실제로 도는지 확인해 깨진 설치를 잡아냅니다).
 
-**현재 상태: 릴리스됨.** `list`·`doctor`·`check`·`audit`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 테스트 150개와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
+**현재 상태: 릴리스됨.** `list`·`doctor`·`check`·`audit`·`--dry-run`·동의 기반 설치/업데이트가 모두 동작하며, 오프라인 테스트와 Linux 컨테이너·macOS·Windows CI의 실채널 검증을 통과했습니다. 확정 결정, 아키텍처, 도구별 매트릭스, 테스트·릴리스 전략 등 전체 설계는 단일 진실 원천인 [SPEC.md](./SPEC.md)에 있습니다.
 
 ## At A Glance
 
 | 항목 | 현재 값 |
 | --- | --- |
 | 목적 | AI 코딩 CLI 감지 · 동의 후 설치 · 업데이트 · 동작 검증 |
-| 관리 도구 (v1) | `claude`, `codex`, `gemini`, `kiro-cli`, `agy` |
+| 관리 도구 (v1) | `claude`, `codex`, `agy` |
 | 플랫폼 | macOS · Windows · Linux |
 | 스택 | Rust (단일 바이너리) |
-| 상태 | 릴리스됨 — 3 OS 전부에서 엔진 검증 (오프라인 테스트 150개 + 실채널 CI) |
+| 상태 | 릴리스됨 — 3 OS 전부에서 엔진 검증 (오프라인 테스트 + 실채널 CI) |
 | 배포 | GitHub Releases · Homebrew tap · npm · crates.io · winget · Scoop · ghcr (Docker) |
-| 테스트 | 오프라인 150개 + Docker 배포판 매트릭스 + 3 OS 실채널 CI |
+| 테스트 | 오프라인 테스트 + Docker 배포판 매트릭스 + 3 OS 실채널 CI |
 | 라이선스 | [MIT](./LICENSE) |
 | 저작자 | [hyeonbungi](https://github.com/hyeonbungi) |
+
+Gemini CLI와 Kiro는 관리 대상에서 제거했습니다. 기존 설정의 `tools`와 `[channels]`에 `gemini` 또는 `kiro`가 있으면 삭제하세요. 이미 설치된 도구를 삭제하지는 않습니다.
 
 ## 설치
 
@@ -87,7 +89,7 @@ powershell -ExecutionPolicy Bypass -c "irm https://github.com/hyeonbungi/sync-ai
 ```dockerfile
 # Docker / devcontainer — 이미지에 AI CLI 베이킹 (정적 musl 바이너리, amd64+arm64)
 COPY --from=ghcr.io/hyeonbungi/sync-ai-clis:latest /sync-ai-clis /usr/local/bin/sync-ai-clis
-RUN sync-ai-clis --yes --only claude,gemini
+RUN sync-ai-clis --yes --only claude,codex
 ```
 
 ## 사용법
@@ -98,8 +100,8 @@ RUN sync-ai-clis --yes --only claude,gemini
 sync-ai-clis                 # 기본: 설치된 건 업데이트, 미설치는 "설치할까요?(y/N)"
 sync-ai-clis --yes, -y       # 비대화: 미설치도 설치 + 전부 업데이트 (CI용)
 sync-ai-clis --no-install    # 업데이트만, 설치 권유 안 함
-sync-ai-clis --only claude,gemini
-sync-ai-clis --except kiro
+sync-ai-clis --only claude,codex
+sync-ai-clis --except antigravity
 sync-ai-clis --dry-run       # 실행할 명령만 출력, 아무것도 실행 안 함
 sync-ai-clis list            # 알려진 도구 + 설치/현재 버전 표 (별칭: status)
 sync-ai-clis doctor          # 읽기 전용 진단: 깨진 설치, 중복 설치, PATH 미반영
@@ -108,7 +110,7 @@ sync-ai-clis audit           # 읽기 전용: 원격 설치 스크립트 변경 
 sync-ai-clis --json          # 자동화용 JSON 요약
 ```
 
-`--only`, `--except`, `--json`은 전역 플래그라 `sync-ai-clis doctor --only gemini --json`처럼 서브커맨드 뒤에서도 사용할 수 있습니다.
+`--only`, `--except`, `--json`은 전역 플래그라 `sync-ai-clis doctor --only codex --json`처럼 서브커맨드 뒤에서도 사용할 수 있습니다.
 
 종료 코드: `0` 전부 정상 · `1` 하나라도 실패 · `2` 사용법 오류 (`check`·`audit`는 `10` = 업데이트 있음/스크립트 변경을 추가로 사용). 설정은 `~/.config/sync-ai-clis/config.toml`에 둡니다(플래그가 config보다 우선).
 
@@ -135,7 +137,7 @@ sync-ai-clis --json          # 자동화용 JSON 요약
 ## 개발
 
 ```bash
-cargo test                 # 오프라인 테스트 150개 — 네트워크·시스템 변경 없음
+cargo test                 # 오프라인 테스트 — 네트워크·시스템 변경 없음
 cargo fmt --check && cargo clippy --all-targets -- -D warnings
 cargo run -- list          # 읽기 전용: 도구 감지·버전 표
 cargo run -- --dry-run     # 실행될 명령만 그대로 출력, 실행 없음
@@ -146,7 +148,6 @@ docker/run-matrix.sh       # 실제 설치/업데이트 통합 (일회용 컨테
 
 ## 알려진 제약
 
-- **Windows의 Kiro**: Windows 11이 필요합니다. 명령 선택은 오프라인으로 검증하고, 전체 데스크톱 설치 검증은 개발 머신이 아니라 Windows CI나 일회용 VM에서 다룹니다.
 - **Alpine/musl**: sync-ai-clis 바이너리 자체는 musl에서 동작하지만, 업스트림 설치기 대부분이 아직 musl 빌드를 제공하지 않습니다.
 - **config `[channels]` 오버라이드**는 업데이트 계획에만 적용됩니다. 미설치 도구 설치와 `doctor` 진단은 실제 감지 상태를 그대로 봅니다.
 

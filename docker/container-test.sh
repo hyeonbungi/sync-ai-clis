@@ -35,8 +35,6 @@ for id in $(printf '%s' "$TOOLS" | tr ',' ' '); do
   case "$id" in
     claude) bin=claude ;;
     codex) bin=codex ;;
-    gemini) bin=gemini ;;
-    kiro) bin=kiro-cli ;;
     antigravity) bin=agy ;;
     *)
       echo "unknown tool id: $id" >&2

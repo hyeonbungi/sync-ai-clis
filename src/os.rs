@@ -1,5 +1,5 @@
-//! OS detection: os/arch, Windows build (Win11 gate for Kiro), Linux libc
-//! (glibc version vs musl, Kiro variant selection). See SPEC.md §5.1.
+//! OS detection: os/arch, Windows build, Linux libc
+//! (glibc version vs musl). See SPEC.md §5.1.
 //!
 //! Parsers are pure functions so every OS branch is testable from any host
 //! (SPEC §8.1); the actual probes are thin wrappers that only run on the
@@ -32,8 +32,7 @@ pub enum Libc {
 }
 
 impl Libc {
-    /// True only for glibc at or above the given version (Kiro needs ≥2.34;
-    /// musl is never "glibc at least"). SPEC §7.4.
+    /// True only for glibc at or above the given version (musl is never "glibc at least"). SPEC §7.4.
     pub fn glibc_at_least(&self, major: u32, minor: u32) -> bool {
         match self {
             Libc::Glibc { major: m, minor: n } => (*m, *n) >= (major, minor),
@@ -53,11 +52,6 @@ pub struct OsInfo {
 }
 
 impl OsInfo {
-    /// Win11 = build 22000 or later (Kiro requires Win11, SPEC §7.4).
-    pub fn is_windows_11(&self) -> bool {
-        self.windows_build.is_some_and(|build| build >= 22000)
-    }
-
     /// Detects the current platform. None on unsupported OS.
     pub fn detect() -> Option<OsInfo> {
         let os = Os::from_env_os(std::env::consts::OS)?;
@@ -159,20 +153,6 @@ mod tests {
     fn os_from_env_rejects_unknown_platforms() {
         assert_eq!(Os::from_env_os("freebsd"), None);
         assert_eq!(Os::from_env_os(""), None);
-    }
-
-    #[test]
-    fn windows_11_starts_at_build_22000() {
-        let info = |build| OsInfo {
-            os: Os::Windows,
-            arch: "x86_64".into(),
-            windows_build: build,
-            libc: None,
-        };
-        assert!(info(Some(22000)).is_windows_11());
-        assert!(info(Some(22631)).is_windows_11());
-        assert!(!info(Some(19045)).is_windows_11()); // Windows 10
-        assert!(!info(None).is_windows_11()); // unknown build = not Win11
     }
 
     #[test]

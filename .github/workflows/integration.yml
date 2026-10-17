@@ -3,10 +3,6 @@
 # machine, SPEC §8.5). Network-dependent and slower, so it runs on manual
 # dispatch and a weekly schedule instead of every push (macOS minutes bill
 # 10x on private repos).
-#
-# Windows runners use Windows Server. Match the CLI's build>=22000 gate:
-# Server 2022 skips; Server 2025 attempts the confirmed PowerShell installer.
-# A Server success does not establish support for every Windows 11 system.
 name: Integration
 
 on:
@@ -64,39 +60,33 @@ jobs:
 
   macos-real:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'all' }}
-    name: macos real channels (5 tools)
+    name: macos real channels (3 tools)
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
       - run: cargo build --release
-      - name: Pre-seed brew cask and npm channels
+      - name: Pre-seed Codex brew cask
         run: |
           brew install --cask codex
-          npm install -g @google/gemini-cli
-      - name: Real sync — natives install, brew/npm channels update
+      - name: Real sync — natives install, brew channel updates
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          ./target/release/sync-ai-clis --yes --only claude,codex,gemini,kiro,antigravity --json > result.json
+          ./target/release/sync-ai-clis --yes --only claude,codex,antigravity --json > result.json
           cat result.json
-          jq -e 'length == 5 and all(.[]; .result == "ok")' result.json
+          jq -e '(map(.id) | sort == ["antigravity", "claude", "codex"]) and all(.[]; .result == "ok")' result.json
       - name: Re-verify every tool runs
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           claude --version
           codex --version
-          gemini --version
-          kiro-cli --version
           agy --version
           ./target/release/sync-ai-clis list
 
   windows-real:
-    name: windows real channels (kiro build gate)
+    name: windows real channels (2 tools)
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -104,41 +94,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release
-      - name: Record Windows build using the CLI's version source
-        shell: pwsh
-        run: |
-          $version = cmd /c ver
-          $build = 0 # Unknown build: the CLI also treats this as unsupported.
-          if ($version -match '\[Version \d+\.\d+\.(\d+)[^\]]*\]') {
-            $build = [uint32]$Matches[1]
-          }
-          Write-Host "Windows build: $build"
-          "KIRO_WINDOWS_BUILD=$build" >> $env:GITHUB_ENV
-      - name: Real sync — native PowerShell installers, validate Kiro build gate
+      - name: Real sync — native PowerShell installers
         shell: bash
         run: |
-          ./target/release/sync-ai-clis.exe --yes --only claude,antigravity,kiro --json > result.json
+          ./target/release/sync-ai-clis.exe --yes --only claude,antigravity --json > result.json
           cat result.json
-          jq -e --argjson windows_build "$KIRO_WINDOWS_BUILD" -f .github/scripts/windows-results.jq result.json
-      - name: Verify Kiro runs after a successful install
-        shell: pwsh
-        run: |
-          $kiro = @(Get-Content -Raw result.json | ConvertFrom-Json | Where-Object id -eq 'kiro')
-          if ($kiro.Count -ne 1) { throw 'Expected exactly one Kiro result' }
-          if ($kiro[0].result -eq 'skip') {
-            Write-Host "Kiro skipped: $($kiro[0].reason)"
-          } else {
-            # MSI updates registry PATH, not the runner process environment.
-            $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-            $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-            $env:Path = "$machinePath;$userPath;$env:Path"
-            $command = Get-Command kiro-cli -CommandType Application -ErrorAction Stop
-            $version = & $command.Source --version
-            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($version -join "`n"))) {
-              throw 'Kiro installed but --version did not succeed'
-            }
-            Write-Host ($version -join "`n")
-          }
+          jq -e -f .github/scripts/windows-results.jq result.json
       - name: Verify antigravity at its known install dir
         shell: pwsh
         run: |

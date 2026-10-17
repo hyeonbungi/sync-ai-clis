@@ -807,17 +807,18 @@ mod tests {
 
     #[test]
     fn unsupported_install_skips_with_reason() {
-        // Registry integration: Kiro on Windows 10 (SPEC §8.1 example).
         let mut fx = Fixture::new();
         fx.os = windows10();
-        let kiro = crate::tools::registry()
-            .into_iter()
-            .find(|t| t.id == "kiro")
-            .unwrap();
-        let report = fx.sync(&kiro, None);
-
+        let tool = ToolSpec {
+            install: |_| Unsupported("fixture platform unsupported"),
+            ..footool()
+        };
+        let report = fx.sync(&tool, None);
         assert_eq!(report.outcome, Outcome::Skip);
-        assert!(report.reason.expect("explains").contains("Windows 11"));
+        assert_eq!(
+            report.reason.as_deref(),
+            Some("fixture platform unsupported")
+        );
         assert!(fx.exec.calls.is_empty());
     }
 

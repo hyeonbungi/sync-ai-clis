@@ -53,15 +53,12 @@ fn ps_installer(script: &str) -> String {
 }
 
 #[test]
-fn registry_lists_five_tools_with_unique_ids() {
+fn registry_lists_three_tools_with_unique_ids() {
     let specs = registry();
     let ids: Vec<&str> = specs.iter().map(|s| s.id).collect();
-    assert_eq!(
-        ids,
-        vec!["claude", "codex", "gemini", "kiro", "antigravity"]
-    );
+    assert_eq!(ids, vec!["claude", "codex", "antigravity"]);
     let bins: Vec<&str> = specs.iter().map(|s| s.bin).collect();
-    assert_eq!(bins, vec!["claude", "codex", "gemini", "kiro-cli", "agy"]);
+    assert_eq!(bins, vec!["claude", "codex", "agy"]);
     assert!(specs.iter().all(|s| s.version_args == ["--version"]));
 }
 
@@ -152,86 +149,6 @@ fn codex_on_broken_reinstalls_per_source() {
 }
 
 #[test]
-fn gemini_prefers_brew_when_installed_that_way() {
-    // SPEC §8.1 example: (os=macos, tool=gemini, source=brew) → brew upgrade gemini-cli.
-    assert_eq!(
-        rendered((spec("gemini").update)(&macos(), InstallSource::Brew)),
-        vec!["brew upgrade gemini-cli"]
-    );
-}
-
-#[test]
-fn gemini_installs_via_npm_and_has_no_native_channel() {
-    let tool = spec("gemini");
-    assert_eq!(
-        rendered((tool.install)(&linux_glibc(2, 39))),
-        vec!["npm install -g @google/gemini-cli"]
-    );
-    assert_eq!(
-        rendered((tool.update)(&windows(22631), InstallSource::Npm)),
-        vec!["npm install -g @google/gemini-cli@latest"]
-    );
-    assert!(
-        (tool.update)(&macos(), InstallSource::Native)
-            .unsupported_reason()
-            .is_some()
-    );
-    // brew on Windows is not a thing.
-    assert!(
-        (tool.update)(&windows(22631), InstallSource::Brew)
-            .unsupported_reason()
-            .is_some()
-    );
-}
-
-#[test]
-fn gemini_has_no_fixed_install_dir() {
-    // npm/brew globals vary by package-manager prefix, so a static
-    // post-install recheck path would be a guess.
-    assert!((spec("gemini").install_dir)(&macos()).is_none());
-}
-
-#[test]
-fn kiro_skips_windows_10_with_a_clear_reason() {
-    // SPEC §8.1 example: (os=windows10, tool=kiro) → SKIP("Win11 필요").
-    let reason = (spec("kiro").install)(&windows(19045))
-        .unsupported_reason()
-        .expect("Win10 must be a skip");
-    assert!(reason.contains("Windows 11"), "reason was: {reason}");
-}
-
-#[test]
-fn kiro_installs_on_windows_11_with_official_powershell_installer() {
-    assert_eq!(
-        rendered((spec("kiro").install)(&windows(22631))),
-        vec![ps_installer("irm https://cli.kiro.dev/install.ps1 | iex")]
-    );
-}
-
-#[test]
-fn kiro_installs_on_unix_and_self_updates() {
-    let tool = spec("kiro");
-    assert_eq!(
-        rendered((tool.install)(&macos())),
-        vec![installer("https://cli.kiro.dev/install", "bash")]
-    );
-    assert_eq!(
-        rendered((tool.install)(&linux_glibc(2, 31))),
-        vec![installer("https://cli.kiro.dev/install", "bash")]
-    );
-    assert_eq!(
-        rendered((tool.update)(&linux_glibc(2, 39), InstallSource::Native)),
-        vec!["kiro-cli update --non-interactive"]
-    );
-    assert!(
-        (tool.update)(&macos(), InstallSource::Brew)
-            .unsupported_reason()
-            .is_some()
-    );
-    assert!(tool.self_updates);
-}
-
-#[test]
 fn antigravity_uses_official_installer_and_agy_update() {
     let tool = spec("antigravity");
     assert_eq!(
@@ -313,41 +230,12 @@ fn codex_windows_paths_use_wrapped_powershell() {
 }
 
 #[test]
-fn gemini_brew_update_also_works_on_linux() {
-    assert_eq!(
-        rendered((spec("gemini").update)(
-            &linux_glibc(2, 39),
-            InstallSource::Brew
-        )),
-        vec!["brew upgrade gemini-cli"]
-    );
-}
-
-#[test]
-fn kiro_installed_on_windows11_self_updates() {
-    // Windows 11 install and update commands are both confirmed in SPEC §7.4.
-    assert_eq!(
-        rendered((spec("kiro").update)(
-            &windows(22631),
-            InstallSource::Native
-        )),
-        vec!["kiro-cli update --non-interactive"]
-    );
-}
-
-#[test]
 fn self_update_flags_match_spec() {
-    // SPEC §5.2: background self-updaters are Claude and Kiro.
+    // SPEC §5.2: background self-updater is Claude.
     let flags: Vec<(&str, bool)> = registry().iter().map(|t| (t.id, t.self_updates)).collect();
     assert_eq!(
         flags,
-        vec![
-            ("claude", true),
-            ("codex", false),
-            ("gemini", false),
-            ("kiro", true),
-            ("antigravity", false),
-        ]
+        vec![("claude", true), ("codex", false), ("antigravity", false),]
     );
 }
 
@@ -365,33 +253,6 @@ fn codex_knows_standalone_install_dirs_for_path_recheck() {
     assert!(
         win_dir.ends_with("Programs/OpenAI/Codex/bin")
             || win_dir.ends_with(r"Programs\OpenAI\Codex\bin"),
-        "dir was: {}",
-        win_dir.display()
-    );
-}
-
-#[test]
-fn kiro_knows_confirmed_install_dirs_for_path_recheck() {
-    let tool = spec("kiro");
-    let mac_dir = (tool.install_dir)(&macos()).expect("kiro mac install dir is known");
-    assert!(
-        mac_dir.ends_with("Kiro CLI.app/Contents/MacOS")
-            || mac_dir.ends_with(r"Kiro CLI.app\Contents\MacOS"),
-        "dir was: {}",
-        mac_dir.display()
-    );
-
-    let linux_dir =
-        (tool.install_dir)(&linux_glibc(2, 39)).expect("kiro linux install dir is known");
-    assert!(
-        linux_dir.ends_with(".local/bin"),
-        "dir was: {}",
-        linux_dir.display()
-    );
-
-    let win_dir = (tool.install_dir)(&windows(22631)).expect("kiro windows install dir is known");
-    assert!(
-        win_dir.ends_with("Kiro-Cli") || win_dir.ends_with(r"Kiro-Cli"),
         "dir was: {}",
         win_dir.display()
     );

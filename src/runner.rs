@@ -349,7 +349,7 @@ mod tests {
             .unwrap();
         assert_eq!(mock.calls, vec!["claude update", "claude --version"]);
         assert!(mock.saw("claude update"));
-        assert!(!mock.saw("gemini --version"));
+        assert!(!mock.saw("codex --version"));
     }
 
     #[test]
@@ -366,10 +366,10 @@ mod tests {
     #[test]
     fn mock_scripted_run_outcome_is_replayed() {
         let mut mock = MockRunner::new();
-        mock.script_run("brew upgrade gemini-cli", false);
+        mock.script_run("brew upgrade sampletool", false);
         assert!(
             !mock
-                .run(&Command::new("brew", &["upgrade", "gemini-cli"]))
+                .run(&Command::new("brew", &["upgrade", "sampletool"]))
                 .unwrap()
         );
         assert!(mock.run(&Command::new("claude", &["update"])).unwrap());

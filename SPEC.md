@@ -4,7 +4,7 @@
 | 항목 | 값 |
 |------|-----|
 | 프로젝트명 | **sync-ai-clis** |
-| 한 줄 설명 | 여러 AI 코딩 CLI(Claude Code·Codex·Gemini·Kiro·Antigravity)를 한 명령으로 **감지·설치·최신 유지**하는 크로스플랫폼 도구 |
+| 한 줄 설명 | 여러 AI 코딩 CLI(Claude Code·Codex·Antigravity)를 한 명령으로 **감지·설치·최신 유지**하는 크로스플랫폼 도구 |
 | 구현 언어 | **Rust** (단일 바이너리) |
 | 지원 OS | **macOS · Windows · Linux** |
 | 라이선스 | **MIT** |
@@ -58,7 +58,7 @@
 ## 3. 목표 / 비목표
 
 ### 목표 (v1)
-- 5개 AI CLI를 3개 OS에서 **감지·설치·업데이트·동작검증**
+- 3개 AI CLI를 3개 OS에서 **감지·설치·업데이트·동작검증**
 - 미설치 도구 **동의 후 설치** (대화형 + `--yes`/`--no-install`/config)
 - **dry-run**: 실행할 명령만 출력(신뢰·디버깅·테스트)
 - 사람이 읽는 요약 + `--json`(자동화)
@@ -75,20 +75,18 @@
 
 ## 4. 대상 도구 × OS 매트릭스 (리서치 결과)
 
-5개 도구 모두 3개 OS에서 설치·업데이트 가능함을 웹 리서치로 확인(2026-06 기준, 출처는 **9. 참고자료**).
+현재 3개 도구 모두 3개 OS에서 설치·업데이트 가능함을 웹 리서치로 확인(2026-06 기준, 출처는 **9. 참고자료**).
 
 | 도구 | bin | mac | win | linux | 공식 설치기 (미설치 시) | self-update | 패키지매니저 |
 |------|-----|:---:|:---:|:---:|------|------|------|
 | Claude Code | `claude` | ✅ | ✅ | ✅ | `install.sh` / `install.ps1` | `claude update` (백그라운드 자동) | brew `claude-code` · winget `Anthropic.ClaudeCode` · npm `@anthropic-ai/claude-code` |
 | Codex (OpenAI) | `codex` | ✅ | ✅ | ✅ | `chatgpt.com/codex/install.sh`/`.ps1` | `codex update`(mac/linux) · Win native는 guarded `install.ps1` 재실행 | npm `@openai/codex` · brew cask `codex`(mac만) |
-| Gemini (Google) | `gemini` | ✅ | ✅ | ✅ | npm `@google/gemini-cli` | (없음 — npm/brew 재설치) | brew `gemini-cli`(mac/linux) · npm |
-| Kiro (AWS) | `kiro-cli` | ✅ | ✅ | ✅ | `cli.kiro.dev/install` / `install.ps1` (Win은 **Win11**) | `kiro-cli update --non-interactive` (+백그라운드 자동) | **❌ 없음** |
 | Antigravity (Google) | `agy` | ✅ | ✅ | ✅ | `antigravity.google/cli/install.sh`/`.ps1` | `agy update` | **❌ 없음** |
 
 ### ⭐ 핵심 설계 인사이트
-**Homebrew/npm은 보편적이지 않다.** Kiro·Antigravity는 둘 다 없고, Codex cask는 mac 전용이다. 반면 **각 도구의 공식 네이티브 설치기 + self-update는 3 OS를 전부 커버**한다.
+**Homebrew/npm은 보편적이지 않다.** Antigravity는 둘 다 없고, Codex cask는 mac 전용이다. 반면 **각 도구의 공식 네이티브 설치기 + self-update는 3 OS를 전부 커버**한다.
 
-→ 따라서 크로스플랫폼 **기본 경로는 "공식 설치기 / self-update"** 로 잡고, Homebrew/npm은 **"이미 그걸로 깔린 경우 그 경로로 업데이트(중복 설치 방지)"** 하는 보조로 둔다. 이것이 원본 스크립트(Codex/Gemini를 brew에 의존)와의 가장 큰 차이다.
+→ 따라서 크로스플랫폼 **기본 경로는 "공식 설치기 / self-update"** 로 잡고, Homebrew/npm은 **"이미 그걸로 깔린 경우 그 경로로 업데이트(중복 설치 방지)"** 하는 보조로 둔다. 이것이 원본 스크립트(여러 도구를 brew에 의존)와의 가장 큰 차이다.
 
 ---
 
@@ -105,15 +103,15 @@
 │ Config(TOML)│──────────▲               │ DryRunRunner │ 출력만
 └─────────────┘          │               └─────────────┘
 ┌─────────────────────────┴──┐  ┌────────────────────────┐
-│ ToolSpec Registry (5종)     │  │ OsInfo / InstallSource │
+│ ToolSpec Registry (3종)     │  │ OsInfo / InstallSource │
 │ 선언형 데이터 + 예외 훅       │  │ 감지                    │
 └────────────────────────────┘  └────────────────────────┘
 ```
 
 - **CommandRunner 추상화 (trait)**: 엔진은 명령을 *문자열로 구성*만 하고 실행은 Runner에 위임. 실제(Real)/테스트(Mock)/dry-run(DryRun) 3종 구현. 덕분에 시스템을 안 건드리고 "OS·설치상태별로 올바른 명령을 고르는지" 단위 테스트 가능 + **`--dry-run`이 공짜로** 따라온다.
-- **OS 감지**: `std::env::consts::OS`(macos/windows/linux) + arch. Kiro용 **Windows 버전 판별(Win11 여부)**, Linux **glibc 버전**(Kiro musl 변형 선택) 추가.
+- **OS 감지**: `std::env::consts::OS`(macos/windows/linux) + arch, Windows 빌드 번호와 Linux libc 종류를 확인한다.
 - **설치 출처 감지(InstallSource)**: 바이너리 경로/매니저 조회(`brew list`·`npm ls -g`·경로 prefix)로 brew·npm·native·**winget·scoop** 중 무엇으로 깔렸는지 판별 → 같은 경로로 업데이트. (Windows: winget→`winget upgrade <id>` / scoop→`scoop update <pkg>` 감지)
-- **graceful unsupported**: 지원 안 되는 조합(예: Win10의 Kiro)은 명확한 사유와 함께 SKIP.
+- **graceful unsupported**: 지원하지 않는 설치 채널은 명확한 사유와 함께 SKIP한다.
 
 ### 5.2 ToolSpec 데이터 모델 (스케치 — 구현 시 확정)
 ```rust
@@ -123,7 +121,7 @@ struct ToolSpec {
     bin: &'static str,           // "claude"  (PATH 감지 + --version)
     version_args: &'static [&'static str], // ["--version"]
     install_dir: fn(&OsInfo) -> Option<PathBuf>, // PATH 미반영 대비 절대경로 재확인 (예: ~/.local/bin)
-    self_updates: bool,          // 백그라운드 자동 업데이트 여부 (Claude/Kiro)
+    self_updates: bool,          // 백그라운드 자동 업데이트 여부 (Claude)
     // OS별 설치 계획 (선호 순서대로). 미지원 OS는 None/Unsupported
     install:  fn(&OsInfo) -> Support<InstallPlan>,
     // OS + 설치출처별 업데이트 계획
@@ -163,8 +161,6 @@ src/
     mod.rs       # registry() -> Vec<ToolSpec>
     claude.rs
     codex.rs
-    gemini.rs
-    kiro.rs
     antigravity.rs
 tests/
   command_selection.rs  # OS×설치상태별 올바른 명령 검증 (MockRunner)
@@ -189,8 +185,8 @@ tests/
 sync-ai-clis                 # 기본: 감지 → 설치된 건 업데이트, 미설치는 "설치할까요?(y/N)"
 sync-ai-clis --yes, -y       # 비대화: 미설치도 설치 + 전부 업데이트 (CI용)
 sync-ai-clis --no-install    # 업데이트만, 설치 권유 안 함
-sync-ai-clis --only claude,gemini      # 일부만
-sync-ai-clis --except kiro              # 일부 제외
+sync-ai-clis --only claude,codex      # 일부만
+sync-ai-clis --except antigravity              # 일부 제외
 sync-ai-clis --dry-run       # 실행할 명령만 출력, 아무것도 실행 안 함
 sync-ai-clis list            # 알려진 도구 + 설치 여부 + 현재/최신 버전 표  (별칭: status)
 sync-ai-clis doctor          # 진단: 깨진 설치 + 중복 설치(여러 채널) + PATH 미반영 탐지, 변경 없음
@@ -199,19 +195,18 @@ sync-ai-clis audit           # 원격 설치 스크립트 변경 감지(읽기 �
 sync-ai-clis --json          # 요약을 JSON으로 (자동화 연동)
 sync-ai-clis --version / --help
 ```
-`--only`, `--except`, `--json`은 전역 플래그라 `sync-ai-clis doctor --only gemini --json`처럼 서브커맨드 뒤에서도 사용할 수 있다.
+`--only`, `--except`, `--json`은 전역 플래그라 `sync-ai-clis doctor --only codex --json`처럼 서브커맨드 뒤에서도 사용할 수 있다.
 
 ### 6.2 config 파일 — `~/.config/sync-ai-clis/config.toml`
 ```toml
 # 관리할 도구 (기본: 알려진 전체)
-tools = ["claude", "codex", "gemini", "kiro", "antigravity"]
+tools = ["claude", "codex", "antigravity"]
 
 # 미설치 도구 처리: prompt | always | never
 install_missing = "prompt"
 
 # (선택) 도구별 선호 채널 오버라이드
 [channels]
-gemini = "brew"   # brew | npm
 codex  = "npm"
 ```
 - Windows config 경로는 `%APPDATA%\sync-ai-clis\config.toml` (또는 `dirs` 크레이트의 config_dir).
@@ -225,8 +220,8 @@ codex  = "npm"
 - `--json`: `[{id, display, installed, before, after, action, result, reason}]` — 표기 분기 없이 원시 값 유지 (dry-run이면 `after: null`)
 - exit: `0` 전부 정상 · `1` 하나라도 실패 · `2` 사용법 오류
 - `doctor`(v0.2.0): 읽기 전용 진단 — 같은 도구가 여러 채널(brew·npm·…)에 깔려 PATH 순서로 가려지는 **중복 설치**, `--version`이 죽는 **깨진 설치**, 설치돼 있지만 **PATH에 없는** 경우를 보고. 문제 발견 시 exit `1`, 깨끗하면 `0`(미설치는 문제 아님 — sync의 일). `--json` 지원: `[{id, display, status, locations: [{path, source, version}], advice}]`
-- `check`(v0.3.0): 읽기 전용 업데이트 가용성 점검 — 설치 버전과 채널별 latest(claude·codex·gemini는 npm 레지스트리 `npm view`, agy는 공식 매니페스트의 `version`)를 비교해 도구별 `current`/`update-available`/`unknown`/`not-installed`/`self-updating`을 보고. 변경 없음(설치/업데이트 실행 안 함). exit: `10` 하나라도 업데이트 있음 · `1` 결론 불가(프로브 실패) · `0` 전부 최신(미설치·self-updating은 중립). `--json`: `[{id, display, installed, current, latest, status, note}]`. kiro는 백그라운드 자동 업데이트라 `self-updating`으로 보고(설계 doc 0012). config `[channels]`는 check에 영향 없음(최신 릴리스 조회는 설치 채널과 무관).
-- `audit`(v0.4.0): 읽기 전용 설치 스크립트 변경 감지 — claude·codex·kiro·agy의 원격 설치 스크립트(`curl|bash`/`irm|iex`)를 fetch해 마지막으로 신뢰한 베이스라인과 비교하고, 변경 시 unified diff(`similar`)를 보여준다. `data_dir`에 스크립트 전문을 저장하며, `audit`(플래그 없음)은 절대 쓰지 않는다 — 모든 쓰기는 `audit --accept`(현재 스크립트를 새 베이스라인으로 확정)로만. 베이스라인이 없는 첫 실행은 `unregistered`로 보고. exit: `10` 하나라도 변경 · `1` fetch 실패(결론 불가) · `0` 변경 없음(미등록·미해당은 중립). `--json`: `[{id, display, status, url, diff}]`. gemini는 npm 경유라 `not-applicable`. §5.5 신뢰 모델의 네 번째 기둥(설계 doc 0013).
+- `check`(v0.3.0): 읽기 전용 업데이트 가용성 점검 — 설치 버전과 채널별 latest(claude·codex는 npm 레지스트리 `npm view`, agy는 공식 매니페스트의 `version`)를 비교해 도구별 `current`/`update-available`/`unknown`/`not-installed`/`self-updating`을 보고. 변경 없음(설치/업데이트 실행 안 함). exit: `10` 하나라도 업데이트 있음 · `1` 결론 불가(프로브 실패) · `0` 전부 최신(미설치·self-updating은 중립). `--json`: `[{id, display, installed, current, latest, status, note}]`. config `[channels]`는 check에 영향 없음(최신 릴리스 조회는 설치 채널과 무관).
+- `audit`(v0.4.0): 읽기 전용 설치 스크립트 변경 감지 — claude·codex·agy의 원격 설치 스크립트(`curl|bash`/`irm|iex`)를 fetch해 마지막으로 신뢰한 베이스라인과 비교하고, 변경 시 unified diff(`similar`)를 보여준다. `data_dir`에 스크립트 전문을 저장하며, `audit`(플래그 없음)은 절대 쓰지 않는다 — 모든 쓰기는 `audit --accept`(현재 스크립트를 새 베이스라인으로 확정)로만. 베이스라인이 없는 첫 실행은 `unregistered`로 보고. exit: `10` 하나라도 변경 · `1` fetch 실패(결론 불가) · `0` 변경 없음(미등록·미해당은 중립). `--json`: `[{id, display, status, url, diff}]`. §5.5 신뢰 모델의 네 번째 기둥(설계 doc 0013).
 
 ---
 
@@ -245,19 +240,6 @@ codex  = "npm"
 - **설치 위치**: standalone 기본값은 mac/linux `~/.local/bin`(`CODEX_INSTALL_DIR`로 override 가능), Windows `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin`
 - **on_broken** (원본 계승): 동작 안 하면 reinstall — mac brew면 `brew reinstall --cask codex`, 그 외 네이티브 설치기 재실행
 - 주의: 비스코프 `codex` npm 패키지는 무관한 2012년 프로젝트 → 반드시 `@openai/codex`
-
-### 7.3 Gemini (`gemini`, Google)
-- **install** npm: `npm i -g @google/gemini-cli`(Node 20+, 보편) · brew(mac/linux): `brew install gemini-cli`
-- **update** 설치출처별: brew→`brew upgrade gemini-cli` · npm→`npm i -g @google/gemini-cli@latest`
-- 비고: 네이티브 self-update 없음. npm/brew 재설치로 갱신. 기본 채널은 npm(보편), brew로 깔렸으면 brew. 고정 `install_dir` 없음(npm/brew prefix 의존).
-
-### 7.4 Kiro (`kiro-cli`, AWS — 구 Amazon Q CLI)
-- **install** mac/linux: `curl -fsSL https://cli.kiro.dev/install | bash` · win(**Win11**, PowerShell/Windows Terminal): `irm https://cli.kiro.dev/install.ps1 | iex` · linux: glibc<2.34면 musl 변형
-- **update**: `kiro-cli update --non-interactive` (+ 백그라운드 자동, 종료 시 적용). `self_updates = true`
-- **설치 위치**: macOS `/Applications/Kiro CLI.app/Contents/MacOS`, linux `~/.local/bin`, Windows `C:\Program Files\Kiro-Cli`
-- **Homebrew/npm 없음**
-- **제약**: Windows는 **Win11 필수** → Win10이면 `Unsupported("Kiro는 Windows 11 필요")`로 SKIP
-- **실제 판별과 CI**: 현재 구현은 제품명 대신 Windows 빌드 번호 `>=22000`으로 설치 가능 여부를 판별한다. Server 2022(20348)는 SKIP, Server 2025(26100)는 설치를 시도한다. 2026-10-17 Integration에서 Server 2025의 Kiro 2.32.0 MSI 설치 성공을 확인했으나, 이는 공식 문서의 Windows 11 지원 범위를 Server 전체로 확장한다는 뜻은 아니다. CI는 이 빌드 조건과 일치하는 결과를 검증하고, `ok`이면 PATH 갱신 후 `--version` 실행도 별도로 확인한다.
 
 ### 7.5 Antigravity (`agy`, Google)
 - **install** mac/linux: `curl -fsSL https://antigravity.google/cli/install.sh | bash` · win(PowerShell, WSL 불필요): `irm https://antigravity.google/cli/install.ps1 | iex`
@@ -281,17 +263,15 @@ codex  = "npm"
 
 ### 8.1 레이어 1 — 단위 테스트 (어느 호스트에서나, 네트워크 없음)
 `MockRunner`로 시스템을 안 건드리고 "주어진 OsInfo·InstallSource·설치상태에서 엔진이 *올바른 명령 문자열*을 고르는지" 검증. OS는 `OsInfo`를 주입 → mac/win/linux 분기를 실제 그 OS가 아니어도 전부 테스트. 가장 싸고 빠르며 로직 버그 대부분을 잡음.
-  - 예: `(os=windows10, tool=kiro)` → SKIP("Win11 필요")
-  - 예: `(os=macos, tool=gemini, source=brew)` → `brew upgrade gemini-cli`
   - 예: `(os=linux, tool=codex, 미설치, --yes)` → 네이티브 설치기 명령
 
 ### 8.2 레이어 2 — Linux 통합: **Docker 매트릭스** ✅
 깨끗한 배포판 이미지에서 **실제 설치·업데이트**를 돌려 검증. 개발기(mac) Docker Desktop에서 로컬로도, CI에서도 동일.
   - 이미지: `ubuntu:22.04`·`ubuntu:24.04`·`debian:12`·`fedora`·`archlinux`·`alpine`(musl)·`rockylinux`
   - 아키텍처: amd64 + **arm64**(`docker buildx`/QEMU)
-  - 커버: 네이티브 설치기(`curl|bash`)·npm 경로·**Kiro AppImage/musl 분기**·**glibc 버전 감지**(≥2.34 vs musl) — Docker로 glibc 다른 이미지를 골라 그 분기를 정확히 테스트. 도구 자신의 **정적 musl 빌드**도 alpine에서 검증
+  - 커버: 공식 네이티브 설치·업데이트, npm 채널, Linux libc 감지. 도구 자신의 정적 musl 빌드도 alpine에서 검증한다.
   - 부작용 격리: 컨테이너 일회용이라 실제 설치를 마음껏 돌려도 호스트 오염 없음
-  - 패턴(개념): `docker run --rm -v "$BIN:/usr/local/bin/sync-ai-clis:ro" ubuntu:24.04 bash -c "sync-ai-clis --yes --only gemini && gemini --version"`
+  - 패턴(개념): `docker run --rm -v "$BIN:/usr/local/bin/sync-ai-clis:ro" ubuntu:24.04 bash -c "sync-ai-clis --yes --only codex && codex --version"`
 
 ### 8.3 레이어 3 — macOS·Windows 통합: **CI 러너** (Docker 불가 영역)
 실제 OS가 필요 → GitHub Actions 러너.
@@ -302,7 +282,7 @@ codex  = "npm"
 ### 8.4 결정성 — 가짜 도구 픽스처 + 실제 스모크 분리
 실제 외부 설치기는 네트워크·계정·속도·flaky 이슈가 있다. 그래서:
   - **가짜 CLI 픽스처**: 더미 도구(`footool` + 스텁 설치기/업데이터)로 엔진 파이프라인(detect→install→update→verify→on_broken)을 **오프라인·결정적**으로 검증
-  - **실제 CLI 스모크**: 5종 실제 설치 후 `--version` 동작만 확인(전체 기능 아님). 네트워크 허용, 별도 잡(예: nightly), flaky 허용
+  - **실제 CLI 스모크**: 3종 실제 설치 후 `--version` 동작만 확인(전체 기능 아님). 네트워크 허용, 별도 잡(예: nightly), flaky 허용
 
 ### 8.5 실행 격리 정책
 - **실제 설치/업데이트를 실행하는 테스트는 격리 환경에서만 한다**: 로컬은 Docker 컨테이너(8.2), CI는 GitHub Actions 러너(8.3).
@@ -354,7 +334,6 @@ GitHub Releases + Homebrew tap formula + npm wrapper + shell/PowerShell 설치�
 ## 11. 열린 질문 / TODO (구현 중 해소)
 
 - [x] **Codex 네이티브 업데이트**: 해소(2026-06-12, TD-003; 2026-07-02 보완) — mac/linux native는 `codex update` 공식 self-update 서브커맨드를 사용한다. Windows native는 Codex updater 내부 PowerShell 호출이 profile/PSModulePath 오염과 `Get-FileHash` 부재를 유발할 수 있어, sync-ai-clis가 같은 공식 `install.ps1`을 `CODEX_NON_INTERACTIVE=1` + `Command::powershell_installer` 래퍼로 직접 실행한다. standalone 설치기 재실행은 install/on_broken recovery 경로에도 유지된다.
-- [x] **Kiro Windows 정확 명령**: 해소(2026-06-12, TD-003) — Win11 PowerShell 설치 `irm https://cli.kiro.dev/install.ps1 | iex`, 업데이트 `kiro-cli update --non-interactive`.
 - [ ] **짧은 별칭 커맨드**: `sync-ai-clis`가 길다면 `saic` 같은 짧은 별칭 바이너리도 제공할지
 - [ ] **자기 자신 포함(self-include)**: 이 도구도 자기 레지스트리에 넣어 brew/npm/cargo로 self-update 할지 (nice-to-have)
 - [ ] **공개 문서 언어**: README·CONTRIBUTING·코드 주석은 **영문 기본**(글로벌 OSS) 가정. 변경 원하면 조정
@@ -363,9 +342,9 @@ GitHub Releases + Homebrew tap formula + npm wrapper + shell/PowerShell 설치�
 - [ ] **Chocolatey**: winget/Scoop로 충분한지, choco도 추가할지(더 'apt식'·관리자 권한 → 후순위/선택)
 - [ ] **winget 자동화 PAT**: WinGet Releaser는 classic PAT(`public_repo` scope) 필요 → 레포 시크릿으로 설정. fine-grained PAT 미지원
 - [ ] **MSI 코드서명**: winget/MSI 배포 시 SmartScreen 경고 완화를 위한 서명 여부(초기엔 미서명으로 시작 가능)
-- [ ] **실제 CLI 스모크 빈도/위치**: 5종 실제 설치 스모크를 어디서(nightly?·on-demand?) 돌릴지 + 일부 CLI 설치의 네트워크/리전 의존성
-- [x] **도구별 `install_dir` 확정**: 해소(2026-06-12, TD-003) — `agy`·`claude`=`~/.local/bin` 계열, `codex` standalone=mac/linux `~/.local/bin`·Windows `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin`, `kiro`=macOS app bundle `Contents/MacOS`·linux `~/.local/bin`·Windows `C:\Program Files\Kiro-Cli`. `gemini`는 npm/brew prefix 의존이라 고정 경로 없음.
-- [x] **출처 분류: brew formula의 동봉 node_modules 오분류** → **해소(v0.2.1)**: `classify_path`가 Cellar/Caskroom을 node_modules보다 먼저 검사 (원 발견 기록: `gemini-cli`처럼 npm 패키지를 libexec에 동봉하는 brew formula는 심링크를 끝까지 풀면 `…/Cellar/<formula>/…/node_modules/…`가 되어 npm 마커가 brew 마커를 이긴다 → 업데이트가 `brew upgrade` 대신 `npm i -g`로 가고(중복 설치 유발 — 아래 prefix 항목과 결합 시 실제 발생), doctor의 출처 라벨도 틀린다. 수정 방향: `/cellar/`·`/caskroom/`을 `node_modules`보다 **먼저** 검사(formula/cask 경로는 결정적), 일반 homebrew prefix 검사는 node_modules 뒤에 둬서 brew-node 경유 npm 글로벌은 계속 npm으로)
+- [ ] **실제 CLI 스모크 빈도/위치**: 3종 실제 설치 스모크를 어디서(nightly?·on-demand?) 돌릴지 + 일부 CLI 설치의 네트워크/리전 의존성
+- [x] **도구별 `install_dir` 확정**: 해소(2026-06-12, TD-003) — `agy`·`claude`=`~/.local/bin` 계열, `codex` standalone=mac/linux `~/.local/bin`·Windows `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin`.
+- [x] **출처 분류: brew formula의 동봉 node_modules 오분류** → **해소(v0.2.1)**: `classify_path`가 Cellar/Caskroom을 node_modules보다 먼저 검사 (원 발견 기록: 가상 formula처럼 npm 패키지를 libexec에 동봉하는 brew formula는 심링크를 끝까지 풀면 `…/Cellar/<formula>/…/node_modules/…`가 되어 npm 마커가 brew 마커를 이긴다 → 업데이트가 `brew upgrade` 대신 `npm i -g`로 가고(중복 설치 유발 — 아래 prefix 항목과 결합 시 실제 발생), doctor의 출처 라벨도 틀린다. 수정 방향: `/cellar/`·`/caskroom/`을 `node_modules`보다 **먼저** 검사(formula/cask 경로는 결정적), 일반 homebrew prefix 검사는 node_modules 뒤에 둬서 brew-node 경유 npm 글로벌은 계속 npm으로)
 - [x] **npm 채널의 prefix 고정** → **해소(v0.2.1)**: 엔진이 기존 바이너리의 소유 npm을 역추적(`owning_npm` — unix `<prefix>/lib/node_modules`↔`<prefix>/bin/npm`, win `<prefix>/node_modules`↔`npm.cmd`)해 절대경로로 실행. 미해석 시 종전대로 `npm` 폴백. dry-run은 재작성된 실제 명령을 표시(§5.5). (원 발견 2026-06-11: nvm 등 다중 node 환경에서 `npm i -g`가 다른 prefix에 새 사본을 만들어 sync가 중복을 유발 — doctor가 첫 실전에서 검출)
 
 ### v2+ 기능 후보 (2026-06-11 제안 — 채택 미정, 검토 중)
@@ -373,9 +352,9 @@ GitHub Releases + Homebrew tap formula + npm wrapper + shell/PowerShell 설치�
 선정 기준은 둘: §5.5 신뢰 모델 강화(이 도구의 정체성), reconcile 실사용 페인포인트. v1 비목표(GUI·데몬·오케스트레이션·텔레메트리)는 유지 전제.
 
 - [x] **`doctor` 서브커맨드** → **채택(2026-06-11)**: §6.1·§6.3에 명세, v0.2.0 구현
-- [x] **`--check` 모드** → **채택·구현(v0.3.0)**: `check` 서브커맨드로 출하(설계 doc 0012). 읽기 전용 업데이트 가용성 점검, 종료코드 `10`(업데이트 있음)/`1`(결론 불가)/`0`(최신). 커버리지 A+agy — claude·codex·gemini는 npm 레지스트리, agy는 공식 매니페스트, kiro는 self-updating. §6.1·§6.3에 명세. 프롬프트 배지는 cron→파일 패턴으로 충족(캐시 비구축).
+- [x] **`--check` 모드** → **채택·구현(v0.3.0)**: `check` 서브커맨드로 출하(설계 doc 0012). 읽기 전용 업데이트 가용성 점검, 종료코드 `10`(업데이트 있음)/`1`(결론 불가)/`0`(최신). 커버리지 A+agy — claude·codex는 npm 레지스트리, agy는 공식 매니페스트,. §6.1·§6.3에 명세. 프롬프트 배지는 cron→파일 패턴으로 충족(캐시 비구축).
 - [ ] **로컬 버전 이력 (+제한적 롤백)**: 실행마다 전·후 버전을 로컬 state(`history.jsonl`)에 기록 — "어제 뭐가 올라갔지?"에 즉답. 텔레메트리 아님(로컬 전용). 롤백은 버전 지정 설치가 가능한 채널(npm 등)만 (추천 3순위)
-- [x] **설치 스크립트 변경 감지** → **채택·구현(2026-06-17, 설계 doc 0013, v0.4.0)**: `audit` 읽기전용 서브커맨드. 원격 설치 스크립트(claude·codex·kiro·agy)를 fetch해 마지막으로 신뢰한 내용과 비교, 변경 시 unified diff(`similar`). 베이스라인은 명시적 `audit --accept`로만 갱신(첫 실행=`unregistered`, 읽기전용 일관), `data_dir`에 전문 저장. 종료코드 `10`(변경)/`1`(fetch 실패)/`0`(변경 없음). §6.1·§6.3에 명세. §5.5 신뢰 모델의 네 번째 기둥.
+- [x] **설치 스크립트 변경 감지** → **채택·구현(2026-06-17, 설계 doc 0013, v0.4.0)**: `audit` 읽기전용 서브커맨드. 원격 설치 스크립트(claude·codex·agy)를 fetch해 마지막으로 신뢰한 내용과 비교, 변경 시 unified diff(`similar`). 베이스라인은 명시적 `audit --accept`로만 갱신(첫 실행=`unregistered`, 읽기전용 일관), `data_dir`에 전문 저장. 종료코드 `10`(변경)/`1`(fetch 실패)/`0`(변경 없음). §6.1·§6.3에 명세. §5.5 신뢰 모델의 네 번째 기둥.
 - [ ] **멀티 머신 상태 비교**: 머신별 `--json` 스냅샷 파일을 모아 어느 머신이 뒤처졌는지 표로 비교 — 동기화 서버 없이 파일 기반만
 - [ ] **레지스트리 확장 기준 명문화**: 새 AI CLI 추가 요건(공식 설치기 존재·HTTPS·라이선스)을 CONTRIBUTING에 명시해 커뮤니티 PR로 성장. 사용자 정의 ToolSpec(config 선언)은 §5.5 하드코딩 URL 원칙과 충돌 — 한다면 "업데이트 명령만 허용, 설치 URL 금지"로 제한 설계
 - [ ] **폴리시 묶음**: 셸 자동완성(clap_complete)·man page·`--json` 스키마 버저닝(1.0 계약 준비)·devcontainer feature(ghcr 이미지의 연장)
@@ -386,8 +365,6 @@ GitHub Releases + Homebrew tap formula + npm wrapper + shell/PowerShell 설치�
 
 - Claude Code 설치/업데이트: https://code.claude.com/docs/en/setup
 - Codex CLI: https://developers.openai.com/codex/cli · https://developers.openai.com/codex/cli/reference · https://www.npmjs.com/package/@openai/codex · https://github.com/openai/codex
-- Gemini CLI: https://geminicli.com/docs/get-started/installation/ · https://www.npmjs.com/package/@google/gemini-cli · https://github.com/google-gemini/gemini-cli
-- Kiro CLI: https://kiro.dev/docs/cli/installation/ · https://kiro.dev/docs/cli/reference/cli-commands/ · https://kiro.dev/blog/cli-2-0/ (Windows 지원)
 - Antigravity CLI: https://antigravity.google/docs/cli-install · https://antigravity.google/docs/cli-getting-started
 - 배포: `dist` (구 cargo-dist) — Rust CLI를 GitHub Releases/Homebrew/npm/shell installer/MSI로 배포
 - Windows 배포: WinGet Releaser 액션 https://github.com/marketplace/actions/winget-releaser · Komac https://github.com/russellbanks/Komac · Scoop https://github.com/ScoopInstaller/scoop · cargo-dist Scoop 이슈 #521 https://github.com/axodotdev/cargo-dist/issues/521

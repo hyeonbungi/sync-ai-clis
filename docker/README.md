@@ -7,7 +7,7 @@ SPEC §8.2의 레이어 2 통합 테스트입니다. **실제 설치/업데이�
 ```bash
 docker/run-matrix.sh                          # 스모크: ubuntu:24.04, claude+antigravity
 MATRIX=full docker/run-matrix.sh              # glibc 배포판 6종 전체
-TOOLS=claude,codex,kiro,antigravity docker/run-matrix.sh   # 도구 선택
+TOOLS=claude,codex,antigravity docker/run-matrix.sh   # 도구 선택
 RUN_MUSL=1 docker/run-matrix.sh               # musl 빌드 + alpine 레그 (실험적)
 PLATFORM=linux/amd64 docker/run-matrix.sh     # QEMU로 교차 아키텍처
 ```
@@ -22,5 +22,4 @@ PLATFORM=linux/amd64 docker/run-matrix.sh     # QEMU로 교차 아키텍처
 ## 주의
 
 - 네트워크 필요(공식 설치기 다운로드). 설치기 쪽 장애로 flaky할 수 있음 — 실패 시 로그로 원인 구분.
-- 기본 도구는 native 설치기 2종(claude·antigravity). gemini는 Node 전제가 커서 기본 제외(필요 시 TOOLS에 추가 + 이미지에 node 직접 설치).
-- musl(alpine) 레그는 실험적: 우리 바이너리는 musl로 빌드되어 돌지만, 업스트림 설치기가 musl 빌드를 제공하지 않을 수 있음 (SPEC §7.4 Kiro만 musl 변형 명시).
+- musl(alpine) 레그는 실험적: 우리 바이너리는 musl로 빌드되어 돌지만, 업스트림 설치기가 musl 빌드를 제공하지 않을 수 있음.

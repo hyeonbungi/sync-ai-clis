@@ -65,7 +65,7 @@ pub struct ToolSpec {
     /// Known absolute install dir for the PATH-not-yet-refreshed re-check
     /// after a fresh install (SPEC §5.5). None = no fixed path is known.
     pub install_dir: fn(&OsInfo) -> Option<PathBuf>,
-    /// True when the tool background-self-updates (Claude, Kiro).
+    /// True when the tool background-self-updates (Claude).
     pub self_updates: bool,
     pub install: fn(&OsInfo) -> Support<Vec<Command>>,
     pub update: fn(&OsInfo, InstallSource) -> Support<Vec<Command>>,
@@ -76,23 +76,15 @@ pub struct ToolSpec {
     pub latest_source: fn(&OsInfo) -> LatestSource,
     /// Current-OS install script URL for `audit` change detection (design
     /// doc 0013). Always a §5.5 hardcoded official HTTPS const; None when the
-    /// tool has no remote install script (gemini installs via npm).
+    /// tool has no remote install script when a tool has no script.
     pub install_script: fn(&OsInfo) -> Option<&'static str>,
 }
 
 mod antigravity;
 mod claude;
 mod codex;
-mod gemini;
-mod kiro;
 
 /// All known tools, in display order.
 pub fn registry() -> Vec<ToolSpec> {
-    vec![
-        claude::spec(),
-        codex::spec(),
-        gemini::spec(),
-        kiro::spec(),
-        antigravity::spec(),
-    ]
+    vec![claude::spec(), codex::spec(), antigravity::spec()]
 }

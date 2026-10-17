@@ -17,10 +17,9 @@ Python 3과 jq로 실제 워크플로의 `.github/scripts/windows-results.jq`를
 python3 -m unittest discover -s tests -p 'test_integration_*.py' -v
 ```
 
-빌드 22000 이상에서는 Kiro `ok`, 미만·빌드 감지 실패에서는 명시한 지원 제한 사유의
-`skip`만 허용합니다. 누락·중복 도구, 잘못된 건너뛰기, 실패 결과도 검증합니다.
-실제 Windows 설치 성공 시에는 별도 단계에서 registry PATH를 갱신한 뒤
-`kiro-cli --version`을 실행합니다. 수동 실행의 `target=windows`는 Windows 작업만 실행합니다.
+Windows 작업은 Claude와 Antigravity의 결과가 각각 한 번씩 있고 모두 `ok`인지 확인합니다.
+누락·중복·추가 도구와 실패·건너뛰기 결과는 허용하지 않습니다.
+수동 실행의 `target=windows`는 Windows 작업만 실행합니다.
 
 `cargo test`에는 다운로드 실패 시 부분 설치기를 실행하지 않는지, npm shim의
 설치 출처와 소유 npm 판별, Codex npm 복구 채널 유지, 설치 거절 시 JSON 출력,

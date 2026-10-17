@@ -7,7 +7,7 @@
 # Usage:
 #   docker/run-matrix.sh                     # smoke: ubuntu:24.04, claude+antigravity
 #   MATRIX=full docker/run-matrix.sh         # all glibc distros
-#   TOOLS=claude,codex,kiro,antigravity docker/run-matrix.sh
+#   TOOLS=claude,codex,antigravity docker/run-matrix.sh
 #   RUN_MUSL=1 docker/run-matrix.sh          # extra: musl build + alpine leg (experimental)
 #   PLATFORM=linux/amd64 docker/run-matrix.sh  # cross-arch via QEMU
 set -euo pipefail

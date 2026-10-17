@@ -23,7 +23,7 @@ pub enum Status {
     Unknown,
     /// Not installed anywhere on PATH — informational, never an issue.
     NotInstalled,
-    /// Tool keeps itself current in the background (Kiro).
+    /// Tool keeps itself current in the background (fixture).
     SelfUpdating,
 }
 
@@ -418,7 +418,7 @@ mod tests {
                 Some("2.1.178"),
             ),
             result("Codex CLI", Status::Current, "0.140.0", Some("0.140.0")),
-            result("Kiro CLI", Status::SelfUpdating, "2.0.0", None),
+            result("Fixture CLI", Status::SelfUpdating, "2.0.0", None),
         ];
         let out = render(&results);
         assert!(out.contains("Claude Code"), "{out}");

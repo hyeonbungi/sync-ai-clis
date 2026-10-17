@@ -21,7 +21,7 @@ pub enum Status {
     Unregistered,
     /// The script could not be fetched (network/HTTP failure).
     Unavailable,
-    /// The tool has no remote install script (npm-managed, like gemini).
+    /// The tool has no remote install script (npm-managed, fixture example).
     NotApplicable,
 }
 
@@ -242,7 +242,7 @@ mod tests {
         }
     }
 
-    /// Fixture with no remote install script (npm-managed, like gemini).
+    /// Fixture with no remote install script (npm-managed, fixture example).
     fn no_script_tool() -> ToolSpec {
         ToolSpec {
             install_script: |_| None,
@@ -397,8 +397,8 @@ mod tests {
         let results = vec![
             result("Claude Code", Status::Changed, Some("DIFF")),
             AuditResult {
-                id: "gemini",
-                display: "Gemini CLI",
+                id: "footool",
+                display: "Fixture CLI",
                 status: Status::NotApplicable,
                 url: None,
                 diff: None,

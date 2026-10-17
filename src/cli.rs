@@ -26,7 +26,7 @@ pub struct Cli {
     #[arg(long)]
     pub no_install: bool,
 
-    /// Only manage these tools (comma-separated ids, e.g. claude,gemini)
+    /// Only manage these tools (comma-separated ids, e.g. claude,codex)
     #[arg(long, global = true, value_delimiter = ',', value_name = "IDS")]
     pub only: Vec<String>,
 
@@ -130,9 +130,9 @@ mod tests {
 
     #[test]
     fn parses_comma_separated_tool_lists() {
-        let cli = parse(&["--only", "claude,gemini", "--except", "kiro"]);
-        assert_eq!(cli.only, vec!["claude", "gemini"]);
-        assert_eq!(cli.except, vec!["kiro"]);
+        let cli = parse(&["--only", "claude,codex", "--except", "antigravity"]);
+        assert_eq!(cli.only, vec!["claude", "codex"]);
+        assert_eq!(cli.except, vec!["antigravity"]);
     }
 
     #[test]
@@ -182,9 +182,9 @@ mod tests {
 
     #[test]
     fn tool_filters_parse_after_doctor_subcommand() {
-        let cli = parse(&["doctor", "--only", "gemini", "--except", "claude"]);
+        let cli = parse(&["doctor", "--only", "codex", "--except", "claude"]);
         assert_eq!(cli.command, Some(Subcmd::Doctor));
-        assert_eq!(cli.only, vec!["gemini"]);
+        assert_eq!(cli.only, vec!["codex"]);
         assert_eq!(cli.except, vec!["claude"]);
     }
 
@@ -227,32 +227,29 @@ mod tests {
     fn selects_all_tools_by_default_in_registry_order() {
         let selected = select_tools(crate::tools::registry(), &[], &[], None).unwrap();
         let ids: Vec<&str> = selected.iter().map(|t| t.id).collect();
-        assert_eq!(
-            ids,
-            vec!["claude", "codex", "gemini", "kiro", "antigravity"]
-        );
+        assert_eq!(ids, vec!["claude", "codex", "antigravity"]);
     }
 
     #[test]
     fn only_filters_and_preserves_registry_order() {
-        let only = vec!["gemini".to_string(), "claude".to_string()];
+        let only = vec!["codex".to_string(), "claude".to_string()];
         let selected = select_tools(crate::tools::registry(), &only, &[], None).unwrap();
         let ids: Vec<&str> = selected.iter().map(|t| t.id).collect();
-        assert_eq!(ids, vec!["claude", "gemini"]); // registry order, not flag order
+        assert_eq!(ids, vec!["claude", "codex"]); // registry order, not flag order
     }
 
     #[test]
     fn except_removes_tools() {
-        let except = vec!["kiro".to_string(), "codex".to_string()];
+        let except = vec!["antigravity".to_string(), "codex".to_string()];
         let selected = select_tools(crate::tools::registry(), &[], &except, None).unwrap();
         let ids: Vec<&str> = selected.iter().map(|t| t.id).collect();
-        assert_eq!(ids, vec!["claude", "gemini", "antigravity"]);
+        assert_eq!(ids, vec!["claude"]);
     }
 
     #[test]
     fn config_tools_act_as_allowlist_under_flags() {
-        let config_tools = vec!["claude".to_string(), "kiro".to_string()];
-        let except = vec!["kiro".to_string()];
+        let config_tools = vec!["claude".to_string(), "antigravity".to_string()];
+        let except = vec!["antigravity".to_string()];
         let selected =
             select_tools(crate::tools::registry(), &[], &except, Some(&config_tools)).unwrap();
         let ids: Vec<&str> = selected.iter().map(|t| t.id).collect();

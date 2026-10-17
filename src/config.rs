@@ -96,25 +96,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn removed_tools_are_rejected_in_channel_configuration() {
+        for id in ["gemini", "kiro"] {
+            let raw = HashMap::from([(id.to_string(), "native".to_string())]);
+            let error = channel_overrides(Some(&raw), &crate::tools::registry()).unwrap_err();
+            assert!(error.contains(id));
+            assert!(error.contains("unknown channel override tool id"));
+        }
+    }
+
+    #[test]
     fn parses_full_config() {
         let config = parse(
             r#"
-tools = ["claude", "gemini"]
+tools = ["claude", "codex"]
 install_missing = "always"
 
 [channels]
-gemini = "brew"
+claude = "brew"
 codex = "npm"
 "#,
         )
         .unwrap();
         assert_eq!(
             config.tools,
-            Some(vec!["claude".to_string(), "gemini".to_string()])
+            Some(vec!["claude".to_string(), "codex".to_string()])
         );
         assert_eq!(config.install_missing, Some(InstallMissing::Always));
         let channels = config.channels.unwrap();
-        assert_eq!(channels.get("gemini").map(String::as_str), Some("brew"));
+        assert_eq!(channels.get("claude").map(String::as_str), Some("brew"));
         assert_eq!(channels.get("codex").map(String::as_str), Some("npm"));
     }
 
@@ -131,11 +141,11 @@ codex = "npm"
     #[test]
     fn validates_channel_overrides() {
         let mut raw = HashMap::new();
-        raw.insert("gemini".to_string(), "npm".to_string());
+        raw.insert("claude".to_string(), "npm".to_string());
         raw.insert("codex".to_string(), "brew".to_string());
 
         let overrides = channel_overrides(Some(&raw), &crate::tools::registry()).unwrap();
-        assert_eq!(overrides.get("gemini"), Some(&InstallSource::Npm));
+        assert_eq!(overrides.get("claude"), Some(&InstallSource::Npm));
         assert_eq!(overrides.get("codex"), Some(&InstallSource::Brew));
     }
 
@@ -152,7 +162,7 @@ codex = "npm"
     #[test]
     fn unknown_channel_name_is_an_error() {
         let mut raw = HashMap::new();
-        raw.insert("gemini".to_string(), "npn".to_string());
+        raw.insert("claude".to_string(), "npn".to_string());
 
         let err = channel_overrides(Some(&raw), &crate::tools::registry()).unwrap_err();
         assert!(err.contains("npn"), "err was: {err}");

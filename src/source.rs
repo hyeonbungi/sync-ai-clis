@@ -160,7 +160,7 @@ fn installed_target(path: &Path) -> PathBuf {
 
 /// Classifies how a binary was installed from its **resolved** path.
 /// Order matters twice over: Cellar/Caskroom store paths are definitive
-/// (brew formulas may vendor npm packages inside the Cellar — gemini-cli
+/// (brew formulas may vendor npm packages inside the Cellar — footool
 /// does — and updating those through npm creates a duplicate, SPEC §11);
 /// below the store level, npm globals installed through a brew-managed
 /// Node live under the bare Homebrew prefix but resolve into
@@ -235,7 +235,7 @@ mod tests {
     #[test]
     fn classifies_brew_cellar_and_caskroom_and_linuxbrew() {
         assert_eq!(
-            classify_path("/opt/homebrew/Cellar/gemini-cli/0.9.0/bin/gemini"),
+            classify_path("/opt/homebrew/Cellar/footool/0.9.0/bin/footool"),
             InstallSource::Brew
         );
         assert_eq!(
@@ -243,7 +243,7 @@ mod tests {
             InstallSource::Brew
         );
         assert_eq!(
-            classify_path("/home/linuxbrew/.linuxbrew/bin/gemini"),
+            classify_path("/home/linuxbrew/.linuxbrew/bin/footool"),
             InstallSource::Brew
         );
     }
@@ -252,7 +252,7 @@ mod tests {
     fn npm_marker_wins_over_brew_prefix() {
         // npm -g via brew-managed Node resolves under the homebrew prefix.
         assert_eq!(
-            classify_path("/opt/homebrew/lib/node_modules/@google/gemini-cli/bundle/gemini.js"),
+            classify_path("/opt/homebrew/lib/node_modules/@example/footool/bundle/footool.js"),
             InstallSource::Npm
         );
         assert_eq!(
@@ -263,12 +263,12 @@ mod tests {
 
     #[test]
     fn formula_and_cask_store_paths_beat_vendored_node_modules() {
-        // gemini-cli's brew formula vendors the npm package inside its
+        // footool's brew formula vendors the npm package inside its
         // Cellar — the store path is definitive, and updating through npm
         // would create a second copy instead (SPEC §11, found live).
         assert_eq!(
             classify_path(
-                "/opt/homebrew/Cellar/gemini-cli/0.45.2/libexec/lib/node_modules/@google/gemini-cli/bundle/gemini.js"
+                "/opt/homebrew/Cellar/footool/0.45.2/libexec/lib/node_modules/@example/footool/bundle/footool.js"
             ),
             InstallSource::Brew
         );
@@ -427,11 +427,11 @@ mod tests {
     #[test]
     fn detect_resolves_symlinks_before_classifying() {
         let root = std::env::temp_dir().join(format!("sync-ai-clis-link-{}", std::process::id()));
-        let store = root.join("lib").join("node_modules").join("@google");
+        let store = root.join("lib").join("node_modules").join("@example");
         std::fs::create_dir_all(&store).unwrap();
-        let target = store.join("gemini.js");
+        let target = store.join("footool.js");
         std::fs::write(&target, "// stub").unwrap();
-        let link = root.join("gemini");
+        let link = root.join("footool");
         std::os::unix::fs::symlink(&target, &link).unwrap();
 
         assert_eq!(detect_from_path(&link), InstallSource::Npm);
@@ -453,22 +453,22 @@ mod windows_regression_tests {
         let dir = std::env::temp_dir().join(format!("sync-lookup-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = std::env::join_paths([&dir]).unwrap();
-        std::fs::write(dir.join("gemini"), "#!/bin/sh\n").unwrap();
-        std::fs::write(dir.join("gemini.ps1"), "# powershell shim\n").unwrap();
-        assert!(find_all_in_path_env_for("gemini", &path, true).is_empty());
-        std::fs::write(dir.join("gemini.cmd"), "@echo off\n").unwrap();
+        std::fs::write(dir.join("footool"), "#!/bin/sh\n").unwrap();
+        std::fs::write(dir.join("footool.ps1"), "# powershell shim\n").unwrap();
+        assert!(find_all_in_path_env_for("footool", &path, true).is_empty());
+        std::fs::write(dir.join("footool.cmd"), "@echo off\n").unwrap();
         assert_eq!(
-            find_all_in_path_env_for("gemini", &path, true),
-            vec![dir.join("gemini.cmd")]
+            find_all_in_path_env_for("footool", &path, true),
+            vec![dir.join("footool.cmd")]
         );
-        std::fs::write(dir.join("gemini.exe"), "fixture").unwrap();
+        std::fs::write(dir.join("footool.exe"), "fixture").unwrap();
         assert_eq!(
-            find_all_in_path_env_for("gemini", &path, true),
-            vec![dir.join("gemini.exe")]
+            find_all_in_path_env_for("footool", &path, true),
+            vec![dir.join("footool.exe")]
         );
         assert_eq!(
-            find_all_in_path_env_for("gemini.cmd", &path, true),
-            vec![dir.join("gemini.cmd")]
+            find_all_in_path_env_for("footool.cmd", &path, true),
+            vec![dir.join("footool.cmd")]
         );
         std::fs::remove_dir_all(dir).unwrap();
     }
@@ -476,23 +476,23 @@ mod windows_regression_tests {
     #[test]
     fn npm_shims_resolve_source_and_owner_without_executing() {
         let root = std::env::temp_dir().join(format!("sync-shim-{}", std::process::id()));
-        let package = root.join("node_modules/@google/gemini-cli");
+        let package = root.join("node_modules/@example/footool");
         std::fs::create_dir_all(&package).unwrap();
         std::fs::write(root.join("npm.cmd"), "@echo off\r\n").unwrap();
         // Missing JS entry points must still be classified as npm so that
         // a broken package can be repaired through its original channel.
         let root = std::fs::canonicalize(&root).unwrap();
-        let target = root.join("node_modules/@google/gemini-cli/missing.js");
+        let target = root.join("node_modules/@example/footool/missing.js");
         for (index, content) in [
             r#"@echo off
-node "%dp0%\node_modules\@google\gemini-cli\missing.js" %*"#,
-            r#"& "$basedir/node_modules/@google/gemini-cli/missing.js" $args"#,
-            r#"exec node "$basedir_win/node_modules/@google/gemini-cli/missing.js" "$@""#,
+node "%dp0%\node_modules\@example\footool\missing.js" %*"#,
+            r#"& "$basedir/node_modules/@example/footool/missing.js" $args"#,
+            r#"exec node "$basedir_win/node_modules/@example/footool/missing.js" "$@""#,
         ]
         .iter()
         .enumerate()
         {
-            let shim = root.join(format!("gemini-{index}.cmd"));
+            let shim = root.join(format!("footool-{index}.cmd"));
             std::fs::write(&shim, content).unwrap();
             assert_eq!(installed_target(&shim), target);
             assert_eq!(detect_from_path(&shim), InstallSource::Npm);

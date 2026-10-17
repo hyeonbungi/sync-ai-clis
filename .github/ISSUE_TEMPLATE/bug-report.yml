@@ -42,8 +42,6 @@ body:
       options:
         - Claude Code
         - Codex CLI
-        - Gemini CLI
-        - Kiro CLI
         - Antigravity CLI
         - sync-ai-clis itself
         - Multiple / not tool-specific

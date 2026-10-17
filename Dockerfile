@@ -4,7 +4,7 @@
 # which the managed tools' installers need. Typical use:
 #
 #   COPY --from=ghcr.io/hyeonbungi/sync-ai-clis:latest /sync-ai-clis /usr/local/bin/sync-ai-clis
-#   RUN sync-ai-clis --yes --only claude,gemini
+#   RUN sync-ai-clis --yes --only claude,codex
 #
 # (--version/--help do run directly, for smoke tests.)
 FROM rust:1-alpine AS builder

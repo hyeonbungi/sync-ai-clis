@@ -32,7 +32,7 @@
   English | <a href="./README.ko.md">한국어</a>
 </p>
 
-> One command to detect, install, and keep your AI coding CLIs up to date — Claude Code, Codex, Gemini, Kiro, and Antigravity.
+> One command to detect, install, and keep your AI coding CLIs up to date — Claude Code, Codex, and Antigravity.
 
 <p align="center">
   <img alt="sync-ai-clis --dry-run: every tool, its detected install channel, and the exact commands that would run" src="https://raw.githubusercontent.com/hyeonbungi/sync-ai-clis/main/.github/assets/terminal-demo.svg" width="600">
@@ -40,21 +40,23 @@
 
 `sync-ai-clis` is a cross-platform (macOS · Windows · Linux) Rust CLI that reconciles your machine toward one state: every known AI CLI installed, working, and current. Installed tools get updated. Missing tools are installed after you consent. Then every tool is re-verified by actually running `--version`, which catches broken installs that `command -v` would miss.
 
-**Current status: released.** `list`, `doctor`, `check`, `audit`, `--dry-run`, and consent-based install/update all work, verified by 150 tests plus real-channel runs on Linux containers, macOS, and Windows CI. [SPEC.md](./SPEC.md) holds the full design — confirmed decisions, architecture, the per-tool install/update matrix, and the test and release strategy. It is the single source of truth for this repository.
+**Current status: released.** `list`, `doctor`, `check`, `audit`, `--dry-run`, and consent-based install/update all work, verified by offline tests plus real-channel runs on Linux containers, macOS, and Windows CI. [SPEC.md](./SPEC.md) holds the full design — confirmed decisions, architecture, the per-tool install/update matrix, and the test and release strategy. It is the single source of truth for this repository.
 
 ## At A Glance
 
 | Area | Current Value |
 | --- | --- |
 | Purpose | Detect · install (with consent) · update · verify AI coding CLIs |
-| Managed tools (v1) | `claude`, `codex`, `gemini`, `kiro-cli`, `agy` |
+| Managed tools (v1) | `claude`, `codex`, `agy` |
 | Platforms | macOS · Windows · Linux |
 | Stack | Rust (single binary) |
-| Status | Released — engine verified on all three OSes (150 offline tests + real-channel CI) |
+| Status | Released — engine verified on all three OSes (offline tests + real-channel CI) |
 | Distribution | GitHub Releases · Homebrew tap · npm · crates.io · winget · Scoop · ghcr (Docker) |
-| Tests | 150 offline tests + Docker distro matrix + 3-OS CI with real-channel runs |
+| Tests | offline tests + Docker distro matrix + 3-OS CI with real-channel runs |
 | License | [MIT](./LICENSE) |
 | Author | [hyeonbungi](https://github.com/hyeonbungi) |
+
+Gemini CLI and Kiro are no longer managed. Remove `gemini` and `kiro` from existing `tools` and `[channels]` configuration entries. Existing installations are not uninstalled.
 
 ## Install
 
@@ -87,7 +89,7 @@ powershell -ExecutionPolicy Bypass -c "irm https://github.com/hyeonbungi/sync-ai
 ```dockerfile
 # Docker / devcontainers — bake AI CLIs into your image (static musl binary, amd64+arm64)
 COPY --from=ghcr.io/hyeonbungi/sync-ai-clis:latest /sync-ai-clis /usr/local/bin/sync-ai-clis
-RUN sync-ai-clis --yes --only claude,gemini
+RUN sync-ai-clis --yes --only claude,codex
 ```
 
 ## Usage
@@ -98,8 +100,8 @@ The contract from [SPEC.md](./SPEC.md) §6, fully implemented:
 sync-ai-clis                 # default: update installed tools, ask (y/N) before installing missing ones
 sync-ai-clis --yes, -y       # non-interactive: install missing + update everything (CI-friendly)
 sync-ai-clis --no-install    # update only, never offer to install
-sync-ai-clis --only claude,gemini
-sync-ai-clis --except kiro
+sync-ai-clis --only claude,codex
+sync-ai-clis --except antigravity
 sync-ai-clis --dry-run       # print the exact commands, execute nothing
 sync-ai-clis list            # known tools + installed/current version table (alias: status)
 sync-ai-clis doctor          # read-only diagnosis: broken, duplicate, or shadowed installs
@@ -108,7 +110,7 @@ sync-ai-clis audit           # read-only: did a remote install script change? un
 sync-ai-clis --json          # machine-readable summary
 ```
 
-`--only`, `--except`, and `--json` are global flags, so they also work after subcommands, for example `sync-ai-clis doctor --only gemini --json`.
+`--only`, `--except`, and `--json` are global flags, so they also work after subcommands, for example `sync-ai-clis doctor --only codex --json`.
 
 Exit codes: `0` all OK · `1` any failure · `2` usage error (`check` and `audit` add `10` = an update is available / a script changed). Configuration lives in `~/.config/sync-ai-clis/config.toml`, and flags win over config.
 
@@ -135,7 +137,7 @@ This tool runs remote official installers (`curl | bash`, `irm | iex`) and packa
 ## Development
 
 ```bash
-cargo test                 # 150 offline tests — no network, no system changes
+cargo test                 # offline tests — no network, no system changes
 cargo fmt --check && cargo clippy --all-targets -- -D warnings
 cargo run -- list          # read-only: detect tools and show versions
 cargo run -- --dry-run     # show exactly what a sync would run, execute nothing
@@ -146,7 +148,6 @@ For the reasoning behind it — decisions, architecture, the per-tool command ma
 
 ## Known Limitations
 
-- **Kiro on Windows**: needs Windows 11. Command selection is covered offline; full desktop install verification belongs in Windows CI or a disposable VM, not on a development machine.
 - **Alpine/musl**: the sync-ai-clis binary runs on musl, but most upstream installers do not ship musl builds yet.
 - **Config `[channels]` overrides** apply to update planning only. Missing-tool installs and `doctor` diagnostics still use the real detected state.
 

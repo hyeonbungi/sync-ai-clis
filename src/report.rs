@@ -149,14 +149,14 @@ mod tests {
 
     fn skip_report() -> ToolReport {
         ToolReport {
-            id: "kiro".into(),
-            display: "Kiro CLI".into(),
+            id: "codex".into(),
+            display: "Codex CLI".into(),
             installed: false,
             before: None,
             after: None,
             action: ActionKind::Install,
             outcome: Outcome::Skip,
-            reason: Some("Kiro requires Windows 11 (SPEC §7.4)".into()),
+            reason: Some("installation declined".into()),
             commands: vec![],
         }
     }
@@ -180,7 +180,7 @@ mod tests {
         let skip = tool_line(&skip_report(), false, false);
         assert!(skip.contains("(none)"), "missing versions render: {skip}");
         assert!(skip.contains("SKIP"), "line: {skip}");
-        assert!(skip.contains("Windows 11"), "reason shown: {skip}");
+        assert!(skip.contains("declined"), "reason shown: {skip}");
     }
 
     #[test]
@@ -189,7 +189,7 @@ mod tests {
         let rows: Vec<&str> = table.lines().collect();
         assert_eq!(rows.len(), 2, "table: {table}");
         assert!(rows[0].contains("Claude Code") && rows[0].contains("OK"));
-        assert!(rows[1].contains("Kiro CLI") && rows[1].contains("SKIP"));
+        assert!(rows[1].contains("Codex CLI") && rows[1].contains("SKIP"));
         // Outcome column aligns: same byte offset for both labels.
         assert_eq!(rows[0].find("OK"), rows[1].find("SK"), "table: {table}");
     }
@@ -214,7 +214,7 @@ mod tests {
         assert_eq!(rows[1]["before"], serde_json::Value::Null);
         assert_eq!(rows[1]["action"], "install");
         assert_eq!(rows[1]["result"], "skip");
-        assert!(rows[1]["reason"].as_str().unwrap().contains("Windows 11"));
+        assert!(rows[1]["reason"].as_str().unwrap().contains("declined"));
     }
 }
 
